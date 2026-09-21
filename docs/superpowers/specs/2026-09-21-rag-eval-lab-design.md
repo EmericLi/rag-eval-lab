@@ -19,11 +19,13 @@ Contraintes :
 
 ### v1 — Benchmark retrieval (ce document)
 
-- **Dataset** : jeu de retrieval public en français, candidat principal **AlloprofRetrieval** (MTEB), sous-échantillonné de façon déterministe. La première tâche du plan vérifie la licence, la taille et le format. Si le dataset est inutilisable, repli sur un autre jeu de retrieval français de MTEB avec qrels au niveau document.
+- **Dataset** : **AlloprofRetrieval** (`lyon-nlp/alloprof` sur Hugging Face, licence Apache-2.0, vérifiée le 2026-09-21) : 2 556 documents (config `documents`, champs `uuid`, `title`, `text`) et 2 316 requêtes de test (config `queries`, split `test`, champs `id`, `text`, `relevant` = liste d'`uuid`). Le corpus est gardé entier ; seules les requêtes sont sous-échantillonnées (graine fixe). Le texte indexé d'un document est `titre + "
+
+" + texte`.
 - **Composants comparés** :
-  - chunking : `none` (document entier), taille fixe avec chevauchement, récursif ;
+  - chunking : `none` (document entier), taille fixe avec chevauchement, récursif. Les tailles sont en **caractères** (ex. `fixed_1000_200`, `recursive_1000`), pour rester indépendantes du tokenizer ;
   - retriever : BM25, dense (2 à 3 modèles multilingues, ex. `multilingual-e5-small`, `bge-m3`), hybride BM25 + dense par Reciprocal Rank Fusion ;
-  - reranker : aucun, ou cross-encoder (ex. `bge-reranker-v2-m3`).
+  - reranker : aucun, ou cross-encoder multilingue. Par défaut `cross-encoder/mmarco-mMiniLMv2-L12-H384-v1` (alias `minilm`, rapide sur CPU) ; `BAAI/bge-reranker-v2-m3` (alias `bge-v2-m3`) disponible mais trop lent sur CPU pour toute la grille.
 - **Métriques** : Recall@k (k = 5, 10), MRR@10, nDCG@10, latence par requête (p50, p95), temps d'indexation.
 - **Sorties** : rapport Markdown (tableaux, graphe de Pareto qualité/latence, graphe d'ablation), README avec résultats clés.
 
@@ -65,7 +67,9 @@ Paquet `src/rag_eval_lab/` :
 | `report/` | Tableaux Markdown et graphiques matplotlib | `build_report(results_dir) -> Path` |
 | `cli.py` | CLI Typer : `rel run <config>`, `rel report <results_dir>` | — |
 
-Outillage : `uv`, `pydantic` (validation des configs), `ruff`, `pytest`, `matplotlib`, `sentence-transformers`, `rank-bm25`, `datasets` (Hugging Face).
+Outillage : `uv`, `pydantic` (validation des configs), `ruff`, `pytest`, `matplotlib`, `rank-bm25`. Les dépendances lourdes (`sentence-transformers`, `datasets`) sont dans l'extra `models`, pour que la CI reste légère (les tests utilisent un encodeur `hashing` sans modèle).
+
+Langue : code, README et rapport en anglais (norme GitHub) ; documents de conception en français.
 
 Les briques sont indépendantes et testables seules. La v2 ajoutera un module `generation/` après le reranker, et la v3 réutilisera `RetrievalPipeline`.
 
@@ -74,19 +78,20 @@ Les briques sont indépendantes et testables seules. La v2 ajoutera un module `g
 Exemple de configuration :
 
 ```yaml
-dataset: { name: alloprof, n_queries: 500, n_docs: 5000, seed: 42 }
+dataset: { name: alloprof, n_queries: 500, seed: 42 }   # n_docs optionnel (corpus entier par défaut)
 k: 10
-candidates: 100          # nombre de candidats passés au reranker
+ks: [5, 10]
+candidates: 30           # nombre de chunks candidats passés au reranker
 grid:
-  chunker:   [none, fixed_512_64, recursive_512]
+  chunker:   [none, fixed_1000_200, recursive_1000]
   retriever: [bm25, dense:e5-small, dense:bge-m3, hybrid:bm25+bge-m3]
-  reranker:  [none, bge-reranker-v2-m3]
+  reranker:  [none, minilm]
 exclude:
-  - { chunker: none, reranker: bge-reranker-v2-m3 }
+  - { chunker: none, reranker: minilm }
 ```
 
 Déroulement de `rel run` :
-1. Charger et sous-échantillonner le dataset (mis en cache localement). Le sous-échantillon de documents contient toujours tous les documents pertinents des requêtes retenues.
+1. Charger et sous-échantillonner le dataset (cache Hugging Face local). Si `n_docs` est fixé, le sous-échantillon de documents contient toujours tous les documents pertinents des requêtes retenues.
 2. Pour chaque configuration de la grille : chunking, puis indexation (avec le cache d'embeddings), avec chronométrage.
 3. Pour chaque requête : récupérer `candidates` chunks, rerank optionnel, remonter aux documents, garder le top-k.
 4. Ajouter une ligne à `results/<run>/results.jsonl` : config, métriques, latences p50/p95, temps d'indexation, versions des modèles, commit git et infos matériel.
@@ -102,7 +107,7 @@ Déroulement de `rel run` :
 
 ## 6. Tests
 
-- `metrics` : valeurs calculées à la main sur de petits cas, et comparaison avec `ranx` sur un exemple.
+- `metrics` : valeurs calculées à la main sur de petits cas (pas de dépendance à `ranx`/`pytrec_eval`, difficiles à installer sous Windows).
 - `chunking` : chevauchement correct, aucun texte perdu, `doc_id` conservé.
 - `pipeline` : remontée des chunks aux documents (max score, dédoublonnage).
 - `retrieval` : fusion RRF sur des classements connus.
@@ -114,6 +119,6 @@ Déroulement de `rel run` :
 - README orienté recruteur : problème, résultats clés (tableau et graphe de Pareto), trois conclusions chiffrées, commande de reproduction, architecture, limites, feuille de route v2 et v3.
 - `docs/results-v1.md` : analyse détaillée et exemples d'échecs.
 - **Critères** :
-  - un inconnu clone le dépôt et reproduit le rapport en 3 commandes : `uv sync`, `uv run rel run configs/v1.yaml`, `uv run rel report results/v1` ;
+  - un inconnu clone le dépôt et reproduit le rapport en 3 commandes : `uv sync --extra models`, `uv run rel run configs/v1.yaml`, `uv run rel report results/v1` ;
   - la grille complète tourne en moins de 2 h sur la machine cible (sinon réduire `n_docs` et `n_queries`) ;
   - la CI est verte.
