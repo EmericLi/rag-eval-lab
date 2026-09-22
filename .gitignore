@@ -1,0 +1,38 @@
+# Python / tooling
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Local caches and heavy artifacts
+.cache/
+*.npy
+results/*/runs/
+results/smoke/
+
+# Secrets and private config (never commit)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+hf_token*
+
+# Local agent / editor workspace
+.claude/
+.superpowers/
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
