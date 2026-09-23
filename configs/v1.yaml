@@ -1,0 +1,13 @@
+# Full v1 grid: chunking x first-stage retriever x reranker on AlloprofRetrieval.
+# n_queries reduced from 500 to 300 after the smoke run (configs/smoke.yaml):
+# reranked configurations cost ~2 s/query on CPU, so 500 queries would add ~1 h.
+dataset: { name: alloprof, n_queries: 300, seed: 42 }
+k: 10
+ks: [5, 10]
+candidates: 30
+grid:
+  chunker:   [none, fixed_1000_200, recursive_1000]
+  retriever: [bm25, dense:e5-small, dense:bge-m3, hybrid:bm25+bge-m3]
+  reranker:  [none, minilm]
+exclude:
+  - { chunker: none, reranker: minilm }
