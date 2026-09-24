@@ -15,6 +15,7 @@ htmlcov/
 .cache/
 *.npy
 results/smoke/
+results/*/runs/
 !results/v1/runs/
 
 # Secrets and private config (never commit)
