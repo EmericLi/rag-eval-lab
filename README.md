@@ -23,7 +23,7 @@ AMD Ryzen 7 8845HS, CPU only.
 | fixed_1000_200 | dense:bge-m3 | none | **0.554** | 0.709 | 221 ms |
 | none | hybrid:bm25+bge-m3 | none | 0.542 | **0.713** | 309 ms |
 | fixed_1000_200 | dense:bge-m3 | minilm | 0.504 | 0.695 | 2,348 ms |
-| none | bm25 | none | 0.351 | 0.502 | **25 ms** |
+| none | bm25 | none | 0.351 | 0.502 | 25 ms |
 | none | dense:e5-small | none | 0.328 | 0.455 | 18 ms |
 
 ![Quality vs latency](results/v1/pareto.png)
@@ -36,8 +36,9 @@ AMD Ryzen 7 8845HS, CPU only.
    BM25 by +24% (0.349 → 0.433) but costs bge-m3 **−9%** (0.554 → 0.504), for 11× the latency.
    Every reranked configuration is off the Pareto front.
 3. **Hybrid search pays only when both sides are comparable.** With bge-m3, RRF matches the
-   dense retriever alone (0.542 vs 0.545), although 17 queries are solved by BM25 only —
-   equal-weight fusion recovers 2 of them, leaving 5 points of hit@10 unclaimed.
+   dense retriever alone (0.542 vs 0.545) — but that flat number hides real churn: fusion
+   recovers 16 queries that only BM25 solved while forfeiting 21 that only dense solved,
+   leaving 6 points of hit@10 between RRF and the oracle union.
 
 Full analysis, failure cases and limitations: [docs/results-v1.md](docs/results-v1.md).
 
