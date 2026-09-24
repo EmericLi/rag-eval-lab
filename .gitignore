@@ -14,8 +14,8 @@ htmlcov/
 # Local caches and heavy artifacts
 .cache/
 *.npy
-results/*/runs/
 results/smoke/
+!results/v1/runs/
 
 # Secrets and private config (never commit)
 .env

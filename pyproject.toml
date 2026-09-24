@@ -4,7 +4,6 @@ version = "0.1.0"
 description = "Benchmark RAG retrieval pipelines (chunking, BM25, dense, hybrid, reranking) on French data."
 readme = "README.md"
 requires-python = ">=3.11"
-license = "MIT"
 authors = [{ name = "EmericLi" }]
 dependencies = [
     "numpy>=1.26",
