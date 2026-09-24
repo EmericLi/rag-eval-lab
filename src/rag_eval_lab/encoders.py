@@ -13,6 +13,9 @@ from rag_eval_lab.text import tokenize
 class Encoder(Protocol):
     name: str
 
+    @property
+    def fingerprint(self) -> str: ...
+
     def encode_queries(self, texts: list[str]) -> np.ndarray: ...
 
     def encode_passages(self, texts: list[str]) -> np.ndarray: ...
@@ -24,6 +27,10 @@ class HashingEncoder:
     def __init__(self, dim: int = 1024) -> None:
         self.dim = dim
         self.name = f"hashing-{dim}"
+
+    @property
+    def fingerprint(self) -> str:
+        return f"hashing|{self.dim}"
 
     def _encode(self, texts: list[str]) -> np.ndarray:
         out = np.zeros((len(texts), self.dim), dtype=np.float32)
@@ -61,6 +68,13 @@ class SentenceTransformerEncoder:
         self.batch_size = batch_size
         self.max_seq_length = max_seq_length
         self._model = model
+
+    @property
+    def fingerprint(self) -> str:
+        return (
+            f"{self.name}|{self.model_id}|{self.query_prefix}|"
+            f"{self.passage_prefix}|{self.max_seq_length}"
+        )
 
     def _get_model(self) -> Any:
         if self._model is None:

@@ -33,10 +33,36 @@ def test_dense_retriever_ranks_and_caches(tmp_path):
     for _ in range(2):
         retriever = DenseRetriever(HashingEncoder(dim=256), cache=cache)
         retriever.index(CHUNKS)
-        hits = retriever.search("una fraction", k=3)
+        hits = retriever.search("une fraction", k=3)
         assert hits[0].chunk.id == "c#0"
         assert [h.score for h in hits] == sorted((h.score for h in hits), reverse=True)
     assert len(list(tmp_path.glob("*.npy"))) == 1
+
+
+class ConfigurableEncoder:
+    """Minimal Encoder whose fingerprint is set independently of its name."""
+
+    def __init__(self, name: str, fingerprint: str) -> None:
+        self.name = name
+        self._fingerprint = fingerprint
+
+    @property
+    def fingerprint(self) -> str:
+        return self._fingerprint
+
+    def encode_queries(self, texts: list[str]) -> np.ndarray:
+        return np.ones((len(texts), 4), dtype=np.float32)
+
+    def encode_passages(self, texts: list[str]) -> np.ndarray:
+        return np.ones((len(texts), 4), dtype=np.float32)
+
+
+def test_dense_retriever_cache_key_depends_on_encoder_fingerprint(tmp_path):
+    cache = EmbeddingCache(tmp_path)
+    DenseRetriever(ConfigurableEncoder("e5", "e5|max_seq_length=256"), cache=cache).index(CHUNKS)
+    DenseRetriever(ConfigurableEncoder("e5", "e5|max_seq_length=512"), cache=cache).index(CHUNKS)
+    # Same encoder name but different fingerprint: no cache sharing, two distinct matrices.
+    assert len(list(tmp_path.glob("*.npy"))) == 2
 
 
 class FixedRetriever:

@@ -57,7 +57,7 @@ class DenseRetriever:
         if self.cache is None:
             self._embeddings = compute()
         else:
-            key = make_key(self.encoder.name, *(c.id for c in self._chunks), *texts)
+            key = make_key(self.encoder.fingerprint, *(c.id for c in self._chunks), *texts)
             self._embeddings = self.cache.get_or_compute(key, compute)
 
     def search(self, query: str, k: int) -> list[Hit]:

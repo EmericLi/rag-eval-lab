@@ -64,6 +64,9 @@ def test_run_id_is_stable_and_depends_on_dataset():
     assert len(first) == 12
     other = _config(dataset={"name": "jsonl", "path": "data/mini", "seed": 7}).run_id(spec)
     assert other != first
+    other_ks = _config(ks=[5]).run_id(spec)
+    assert other_ks != first
+    assert other_ks == _config(ks=[5]).run_id(spec)
 
 
 def test_load_config_from_yaml(tmp_path):

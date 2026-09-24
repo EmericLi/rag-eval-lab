@@ -88,6 +88,7 @@ class ExperimentConfig(BaseModel):
         return make_key(
             self.dataset.model_dump_json(),
             str(self.k),
+            ",".join(map(str, self.ks)),
             str(self.candidates),
             spec.chunker,
             spec.retriever,

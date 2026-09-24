@@ -52,6 +52,11 @@ def test_hashing_encoder_empty_text_is_zero_vector():
     assert np.count_nonzero(vector) == 0
 
 
+def test_hashing_encoder_fingerprint_differs_by_dim():
+    assert HashingEncoder(dim=64).fingerprint != HashingEncoder(dim=128).fingerprint
+    assert HashingEncoder(dim=64).fingerprint == HashingEncoder(dim=64).fingerprint
+
+
 class FakeSentenceTransformer:
     def __init__(self):
         self.seen: list[str] = []
@@ -78,3 +83,24 @@ def test_sentence_transformer_encoder_applies_prefixes():
     assert fake.seen == ["passage: b", "passage: c"]
     assert out.shape == (2, 2)
     assert out.dtype == np.float32
+
+
+def test_sentence_transformer_fingerprint_depends_on_max_seq_length():
+    base = SentenceTransformerEncoder(name="e5", model_id="x", max_seq_length=256)
+    changed = SentenceTransformerEncoder(name="e5", model_id="x", max_seq_length=512)
+    assert base.fingerprint != changed.fingerprint
+    assert make_key(base.fingerprint) != make_key(changed.fingerprint)
+
+
+def test_sentence_transformer_fingerprint_depends_on_query_prefix():
+    base = SentenceTransformerEncoder(name="e5", model_id="x", query_prefix="")
+    changed = SentenceTransformerEncoder(name="e5", model_id="x", query_prefix="query: ")
+    assert base.fingerprint != changed.fingerprint
+
+
+def test_sentence_transformer_fingerprint_stable_and_includes_model_id():
+    a = SentenceTransformerEncoder(name="e5", model_id="x")
+    b = SentenceTransformerEncoder(name="e5", model_id="x")
+    c = SentenceTransformerEncoder(name="e5", model_id="y")
+    assert a.fingerprint == b.fingerprint
+    assert a.fingerprint != c.fingerprint
