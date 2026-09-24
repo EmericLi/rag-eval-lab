@@ -81,6 +81,7 @@ def _run_one(
     cache: EmbeddingCache,
     out_dir: Path,
     config_id: str,
+    env_info: dict,
 ) -> dict:
     pipeline = RetrievalPipeline(
         chunker=parse_chunker(spec.chunker),
@@ -113,7 +114,7 @@ def _run_one(
         "n_docs": len(dataset.documents),
         "n_queries": len(dataset.queries),
         "dataset": dataset.name,
-        "env": environment_info(),
+        "env": env_info,
     }
 
 
@@ -128,6 +129,7 @@ def run_experiment(
     if dataset is None:
         dataset = load_benchmark(config.dataset)
     cache = EmbeddingCache(Path(config.cache_dir))
+    env_info = environment_info()
 
     records = []
     for n, spec in enumerate(specs, start=1):
@@ -139,7 +141,10 @@ def run_experiment(
         logger.info("[%d/%d] run: %s", n, len(specs), label)
         record = {"config_id": config_id, **spec.model_dump()}
         try:
-            record.update(status="ok", **_run_one(config, spec, dataset, cache, out_dir, config_id))
+            record.update(
+                status="ok",
+                **_run_one(config, spec, dataset, cache, out_dir, config_id, env_info),
+            )
         except Exception as exc:  # one failing config must not stop the grid
             logger.exception("Configuration failed: %s", label)
             record.update(status="error", error=f"{type(exc).__name__}: {exc}")

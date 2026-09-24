@@ -41,6 +41,15 @@ def test_cli_rejects_invalid_config(tmp_path, mini_jsonl):
     assert "Unknown encoder" in result.output
 
 
+def test_cli_rejects_malformed_yaml(tmp_path):
+    config = tmp_path / "bad.yaml"
+    config.write_text("dataset: [unterminated\nretriever: bm25", encoding="utf-8")
+    result = runner.invoke(app, ["run", str(config)])
+    assert result.exit_code == 1
+    assert "Traceback" not in result.output
+    assert f"Invalid config {config}" in result.output
+
+
 def test_cli_report_without_results(tmp_path):
     (tmp_path / "results.jsonl").write_text("", encoding="utf-8")
     result = runner.invoke(app, ["report", str(tmp_path)])

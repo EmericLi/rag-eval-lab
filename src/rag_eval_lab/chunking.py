@@ -22,6 +22,8 @@ def _make_chunks(doc: Document, pieces: list[str]) -> list[Chunk]:
 
 
 class NoChunker:
+    """Keep each document as a single chunk."""
+
     name = "none"
 
     def chunk(self, doc: Document) -> list[Chunk]:
@@ -29,6 +31,8 @@ class NoChunker:
 
 
 class FixedChunker:
+    """Split into fixed-size, overlapping windows of characters."""
+
     def __init__(self, size: int, overlap: int) -> None:
         if size <= 0 or not 0 <= overlap < size:
             raise ValueError(f"Invalid fixed chunker: size={size}, overlap={overlap}")

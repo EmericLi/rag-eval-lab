@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Annotated
 
 import typer
+import yaml
 from pydantic import ValidationError
 
 from rag_eval_lab.config import load_config
@@ -29,7 +30,7 @@ def run(
     )
     try:
         cfg = load_config(config)
-    except ValidationError as exc:
+    except (ValidationError, yaml.YAMLError) as exc:
         typer.echo(f"Invalid config {config}:\n{exc}", err=True)
         raise typer.Exit(code=1) from exc
     out_dir = out or Path("results") / config.stem

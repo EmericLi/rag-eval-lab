@@ -148,6 +148,11 @@ def build_report(results_dir: Path) -> Path:
         "- Latency is measured per query on CPU, including query encoding and reranking.",
         "- Index time includes embedding computation only when the embedding cache was cold.",
         "- ★ marks configurations on the quality/latency Pareto front.",
+        "- Reranking only rescores the first-stage candidate pool (`candidates` chunks per "
+        "query), so recall is bounded by that pool and cannot exceed it.",
+        "- The index-time column mixes cold and warm embedding-cache runs, and can be "
+        "inflated if the machine slept mid-run; treat it as diagnostic only, not a "
+        "comparable cost metric.",
         "",
     ]
 
