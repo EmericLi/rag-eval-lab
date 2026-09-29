@@ -1,0 +1,11 @@
+# Small grid to validate the setup and measure timings before the full run.
+dataset: { name: alloprof, n_queries: 50, seed: 42 }
+k: 10
+ks: [5, 10]
+candidates: 30
+grid:
+  chunker:   [none, recursive_1000]
+  retriever: [bm25, dense:e5-small, hybrid:bm25+e5-small]
+  reranker:  [none, minilm]
+exclude:
+  - { chunker: none, reranker: minilm }

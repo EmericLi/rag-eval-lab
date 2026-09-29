@@ -20,7 +20,7 @@
 - Dataset : `lyon-nlp/alloprof`, configs `documents` (split `test`, champs `uuid`, `title`, `text`) et `queries` (split `test`, champs `id`, `text`, `relevant`).
 - Reproduction : `uv sync --extra models`, `uv run rel run configs/v1.yaml`, `uv run rel report results/v1`.
 - Grille v1 complète < 2 h sur Ryzen 7 8845HS CPU, sinon réduire `n_queries`.
-- Commits : messages conventionnels (`feat:`, `test:`, `docs:`, `chore:`), terminés par `Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>`. Identité git du dépôt : `EmericLi <145478297+EmericLi@users.noreply.github.com>` (déjà configurée, ne pas modifier).
+- Commits : messages conventionnels (`feat:`, `test:`, `docs:`, `chore:`), **sans** ligne `Co-Authored-By` (auteur unique : l'utilisateur). Identité git du dépôt : `EmericLi <145478297+EmericLi@users.noreply.github.com>` (déjà configurée, ne pas modifier).
 - Toutes les commandes se lancent depuis la racine `C:\Users\Emeric\travail\portofolio\rag-eval-lab`.
 
 ## File Structure
@@ -340,9 +340,7 @@ jobs:
 
 ```bash
 git add pyproject.toml uv.lock .python-version .gitignore README.md .github src tests
-git commit -m "chore: scaffold project with core types, fixtures and CI
-
-Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
+git commit -m "chore: scaffold project with core types, fixtures and CI"
 ```
 
 ---
@@ -491,9 +489,7 @@ Expected: `7 passed`
 
 ```bash
 git add src/rag_eval_lab/metrics.py tests/test_metrics.py
-git commit -m "feat: add recall, MRR and nDCG metrics
-
-Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
+git commit -m "feat: add recall, MRR and nDCG metrics"
 ```
 
 ---
@@ -709,9 +705,7 @@ Expected: `10 passed`
 
 ```bash
 git add src/rag_eval_lab/chunking.py tests/test_chunking.py
-git commit -m "feat: add none, fixed and recursive chunkers
-
-Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
+git commit -m "feat: add none, fixed and recursive chunkers"
 ```
 
 ---
@@ -977,9 +971,7 @@ Expected: `8 passed`
 
 ```bash
 git add src/rag_eval_lab/text.py src/rag_eval_lab/cache.py src/rag_eval_lab/encoders.py tests/test_cache_encoders.py
-git commit -m "feat: add tokenizer, embedding cache and encoders
-
-Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
+git commit -m "feat: add tokenizer, embedding cache and encoders"
 ```
 
 ---
@@ -1189,9 +1181,7 @@ Expected: `6 passed`
 
 ```bash
 git add src/rag_eval_lab/retrieval.py tests/test_retrieval.py
-git commit -m "feat: add BM25, dense and hybrid RRF retrievers
-
-Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
+git commit -m "feat: add BM25, dense and hybrid RRF retrievers"
 ```
 
 ---
@@ -1406,9 +1396,7 @@ Expected: `6 passed`
 
 ```bash
 git add src/rag_eval_lab/reranking.py src/rag_eval_lab/pipeline.py tests/test_pipeline.py
-git commit -m "feat: add cross-encoder reranker and retrieval pipeline
-
-Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
+git commit -m "feat: add cross-encoder reranker and retrieval pipeline"
 ```
 
 ---
@@ -1725,9 +1713,7 @@ Expected: `10 passed`
 
 ```bash
 git add src/rag_eval_lab/factory.py src/rag_eval_lab/config.py tests/test_config.py
-git commit -m "feat: add validated experiment config and component factory
-
-Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
+git commit -m "feat: add validated experiment config and component factory"
 ```
 
 ---
@@ -1922,9 +1908,7 @@ Expected: `7 passed`
 
 ```bash
 git add src/rag_eval_lab/data.py tests/test_data.py
-git commit -m "feat: add jsonl and Alloprof loaders with deterministic sampling
-
-Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
+git commit -m "feat: add jsonl and Alloprof loaders with deterministic sampling"
 ```
 
 ---
@@ -2190,9 +2174,7 @@ Expected: `4 passed`
 
 ```bash
 git add src/rag_eval_lab/experiment.py tests/test_experiment.py
-git commit -m "feat: add resumable experiment runner with error isolation
-
-Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
+git commit -m "feat: add resumable experiment runner with error isolation"
 ```
 
 ---
@@ -2438,9 +2420,7 @@ Expected: `4 passed`
 
 ```bash
 git add src/rag_eval_lab/report.py tests/test_report.py
-git commit -m "feat: add Markdown report with Pareto and ranking charts
-
-Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
+git commit -m "feat: add Markdown report with Pareto and ranking charts"
 ```
 
 ---
@@ -2582,9 +2562,7 @@ Expected: `68 passed`, `All checks passed!`, aucun fichier à reformater (sinon 
 
 ```bash
 git add src/rag_eval_lab/cli.py tests/test_cli.py
-git commit -m "feat: add rel CLI with run and report commands
-
-Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
+git commit -m "feat: add rel CLI with run and report commands"
 ```
 
 ---
@@ -2644,9 +2622,7 @@ Noter dans le compte rendu à l'utilisateur : le temps d'indexation `recursive_1
 
 ```bash
 git add configs/smoke.yaml
-git commit -m "chore: add smoke config validated on Alloprof
-
-Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
+git commit -m "chore: add smoke config validated on Alloprof"
 ```
 
 (Les résultats de la grille réduite ne sont pas commités.)
@@ -2786,9 +2762,7 @@ Vérifier que les liens d'images du README (`results/v1/pareto.png`) pointent ve
 
 ```bash
 git add configs/v1.yaml docs/results-v1.md README.md LICENSE results/v1/results.jsonl results/v1/report.md results/v1/pareto.png results/v1/ranking.png
-git commit -m "docs: add v1 benchmark results, analysis and README
-
-Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
+git commit -m "docs: add v1 benchmark results, analysis and README"
 ```
 
 La publication sur GitHub (création du dépôt `EmericLi/rag-eval-lab` et `git push`) n'est **pas** dans ce plan : elle se fait uniquement avec l'accord explicite de l'utilisateur.
