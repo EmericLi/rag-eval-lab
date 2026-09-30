@@ -2,6 +2,11 @@
 
 [![CI](https://github.com/EmericLi/rag-eval-lab/actions/workflows/ci.yml/badge.svg)](https://github.com/EmericLi/rag-eval-lab/actions/workflows/ci.yml)
 
+**What this is for.** When a RAG assistant answers badly, the cause is usually retrieval:
+the right document never reached the model. Teams rarely measure this — they tune prompts
+instead. This project measures it, on a real French corpus, and shows what each component of
+the retrieval stack is actually worth in quality and in latency.
+
 **Which retrieval setup should a French-language RAG system use — and what does each
 component actually buy you?**
 
