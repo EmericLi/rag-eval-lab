@@ -122,5 +122,4 @@ offline.
 
 ## License
 
-Not licensed yet — all rights reserved for now. Dataset: AlloprofRetrieval
-(`lyon-nlp/alloprof`, Apache-2.0).
+MIT — see [LICENSE](LICENSE). Dataset: AlloprofRetrieval (`lyon-nlp/alloprof`, Apache-2.0).
