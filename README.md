@@ -111,7 +111,7 @@ Any corpus can be benchmarked by pointing the config at a JSONL dataset
 
 ```bash
 uv sync
-uv run pytest      # 68 tests, no network, no model download
+uv run pytest      # unit tests, no network, no model download
 uv run ruff check .
 ```
 
