@@ -1,12 +1,11 @@
 # rag-eval-lab — Design (v1)
 
 Date : 2026-09-21
-Statut : validé en brainstorming, en attente de relecture
+Statut : implémenté en v1
 
 ## 1. Contexte et objectif
 
-Projet portfolio GitHub pour une recherche de poste d'ingénieur IA (profil junior).
-Il doit démontrer la capacité à **prendre des décisions techniques par la mesure** plutôt qu'à l'intuition.
+Projet de R&D public. Il doit démontrer la capacité à **prendre des décisions techniques par la mesure** plutôt qu'à l'intuition.
 
 Question centrale : *« Quelle configuration RAG choisir pour un corpus français, et que rapporte vraiment chaque composant par rapport à ce qu'il coûte ? »*
 
