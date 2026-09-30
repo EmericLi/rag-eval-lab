@@ -8,7 +8,7 @@
 
 **Tech Stack:** Python ≥ 3.11 (dev en 3.13), uv, pydantic v2, typer, numpy, rank-bm25, matplotlib, pytest, ruff ; extra `models` : sentence-transformers, datasets (Hugging Face).
 
-**Spec :** `docs/superpowers/specs/2026-09-21-rag-eval-lab-design.md`
+**Spec :** `docs/design/specs/2026-09-21-rag-eval-lab-design.md`
 
 ## Global Constraints
 
