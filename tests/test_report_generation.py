@@ -228,3 +228,28 @@ def test_build_report_chart_survives_a_none_rate(tmp_path):
     )
     build_generation_report(tmp_path)
     assert (tmp_path / "generation.png").stat().st_size > 0
+
+
+def test_load_judgments_skips_torn_trailing_line(tmp_path):
+    path = tmp_path / "judgments.jsonl"
+    # Write valid lines followed by a torn line
+    with path.open("w", encoding="utf-8") as f:
+        f.write(json.dumps(_judgment("a", True, True)) + "\n")
+        f.write(json.dumps(_judgment("b", False, True)) + "\n")
+        f.write('{"answer_id": "c", "status": "ok", "faithfulness":')  # truncated
+    judgments = load_judgments(tmp_path)
+    # Should return only the two valid judgments, skipping the truncated one
+    assert len(judgments) == 2
+    assert {j["answer_id"] for j in judgments} == {"a", "b"}
+
+
+def test_load_judgments_skips_lines_without_answer_id(tmp_path):
+    path = tmp_path / "judgments.jsonl"
+    with path.open("w", encoding="utf-8") as f:
+        f.write(json.dumps(_judgment("a", True, True)) + "\n")
+        f.write(json.dumps({"status": "ok", "faithfulness": True}) + "\n")  # no answer_id
+        f.write(json.dumps(_judgment("b", False, True)) + "\n")
+    judgments = load_judgments(tmp_path)
+    # Should return only the judgments with answer_id
+    assert len(judgments) == 2
+    assert {j["answer_id"] for j in judgments} == {"a", "b"}

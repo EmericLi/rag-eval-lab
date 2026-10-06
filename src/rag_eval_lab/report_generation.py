@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import statistics
 from pathlib import Path
 
@@ -15,17 +16,26 @@ from rag_eval_lab.annotation import load_annotations  # noqa: E402
 from rag_eval_lab.calibration import agreement  # noqa: E402
 from rag_eval_lab.generation_experiment import load_answers  # noqa: E402
 
+logger = logging.getLogger(__name__)
+
 CRITERIA = ("faithfulness", "relevance", "correctness")
 
 
 def load_judgments(out_dir: Path) -> list[dict]:
+    """Last record per answer_id, successful ones only; unreadable lines are skipped."""
     path = Path(out_dir) / "judgments.jsonl"
     latest: dict[str, dict] = {}
     if path.exists():
-        for line in path.read_text(encoding="utf-8").splitlines():
-            if line.strip():
+        text = path.read_text(encoding="utf-8", errors="replace")
+        for number, line in enumerate(text.splitlines(), start=1):
+            if not line.strip():
+                continue
+            try:
                 record = json.loads(line)
-                latest[record["answer_id"]] = record
+                if "answer_id" in record:
+                    latest[record["answer_id"]] = record
+            except (json.JSONDecodeError, TypeError, KeyError):
+                logger.warning("skipping unreadable line %d of %s", number, path)
     return [r for r in latest.values() if r.get("status") == "ok"]
 
 

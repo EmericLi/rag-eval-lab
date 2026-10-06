@@ -89,7 +89,14 @@ def generate(
         typer.echo(str(exc), err=True)
         raise typer.Exit(code=1) from exc
     failed = [r for r in records if r["status"] == "error"]
-    typer.echo(f"{len(records)} answer(s) generated, {len(failed)} failed -> {out_dir}")
+    succeeded = len(records) - len(failed)
+    typer.echo(
+        f"{len(records)} answer(s) attempted, {succeeded} ok, {len(failed)} failed -> {out_dir}"
+    )
+    if failed:
+        typer.echo("Re-run the same command to retry only the failed items.")
+    if len(failed) == len(records):
+        raise typer.Exit(code=1)
 
 
 @app.command()
@@ -110,7 +117,14 @@ def judge(
         typer.echo(str(exc), err=True)
         raise typer.Exit(code=1) from exc
     failed = [r for r in records if r["status"] == "error"]
-    typer.echo(f"{len(records)} answer(s) judged, {len(failed)} failed -> {results_dir}")
+    succeeded = len(records) - len(failed)
+    typer.echo(
+        f"{len(records)} answer(s) attempted, {succeeded} ok, {len(failed)} failed -> {results_dir}"
+    )
+    if failed:
+        typer.echo("Re-run the same command to retry only the failed items.")
+    if len(failed) == len(records):
+        raise typer.Exit(code=1)
 
 
 @app.command()

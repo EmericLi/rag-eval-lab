@@ -82,3 +82,57 @@ def test_report_gen_without_judgments(tmp_path):
     (tmp_path / "judgments.jsonl").write_text("", encoding="utf-8")
     result = runner.invoke(app, ["report-gen", str(tmp_path)])
     assert result.exit_code == 1
+
+
+def test_generate_exits_1_when_all_items_fail(tmp_path, mini_jsonl, monkeypatch):
+    from rag_eval_lab import cli
+
+    class AlwaysFailTransport:
+        def __call__(self, method, path, payload):
+            if path == "/api/tags":
+                return {"models": [{"name": "fake-model", "digest": "0123456789abcdef"}]}
+            raise Exception("boom")
+
+    monkeypatch.setattr(
+        cli,
+        "build_client",
+        lambda timeout_s: cli.OllamaClient(transport=AlwaysFailTransport(), retries=0),
+    )
+
+    config = _write_config(tmp_path, mini_jsonl)
+    out = tmp_path / "results"
+    result = runner.invoke(app, ["generate", str(config), "--out", str(out)])
+    assert result.exit_code == 1
+    assert "4 answer(s) attempted, 0 ok, 4 failed" in result.output
+    assert "retry" in result.output.lower()
+
+
+def test_generate_exits_0_when_some_items_succeed(tmp_path, mini_jsonl, monkeypatch):
+    from rag_eval_lab import cli
+
+    attempt_count = 0
+
+    class SometimesFailTransport:
+        def __call__(self, method, path, payload):
+            nonlocal attempt_count
+            if path == "/api/tags":
+                return {"models": [{"name": "fake-model", "digest": "0123456789abcdef"}]}
+            attempt_count += 1
+            if attempt_count == 1:
+                raise Exception("boom")
+            return {"response": "réponse", "eval_count": 3, "prompt_eval_count": 10}
+
+    monkeypatch.setattr(
+        cli,
+        "build_client",
+        lambda timeout_s: cli.OllamaClient(transport=SometimesFailTransport(), retries=0),
+    )
+
+    config = _write_config(tmp_path, mini_jsonl)
+    out = tmp_path / "results"
+    result = runner.invoke(app, ["generate", str(config), "--out", str(out)])
+    assert result.exit_code == 0
+    assert "attempted" in result.output
+    assert "ok" in result.output
+    assert "failed" in result.output
+    assert "retry" in result.output.lower()
