@@ -90,3 +90,52 @@ def test_judge_coerces_string_booleans():
     )
     verdict = _judge(transport).verdict("Q ?", PASSAGES, "a", "ref")
     assert (verdict.faithfulness, verdict.relevance, verdict.correctness) == (True, False, True)
+
+
+def test_judge_retries_on_non_boolean_value_then_succeeds():
+    transport = ScriptedTransport(
+        [
+            '{"faithful": "maybe", "relevant": true, "reason": "r"}',
+            '{"faithful": true, "relevant": true, "reason": "r"}',
+        ]
+    )
+    verdict = _judge(transport, retries=1).verdict("Q ?", PASSAGES, "a", "")
+    assert (verdict.faithfulness, verdict.relevance) == (True, True)
+    assert len(transport.prompts) == 2
+
+
+def test_judge_raises_last_raw_output_when_every_value_is_non_boolean():
+    transport = ScriptedTransport(
+        [
+            '{"faithful": null, "relevant": true, "reason": "r"}',
+            '{"faithful": "maybe", "relevant": true, "reason": "r"}',
+        ]
+    )
+    with pytest.raises(JudgeParseError) as excinfo:
+        _judge(transport, retries=1).verdict("Q ?", PASSAGES, "a", "")
+    assert excinfo.value.raw_output == '{"faithful": "maybe", "relevant": true, "reason": "r"}'
+    assert len(transport.prompts) == 2
+
+
+def test_judge_retries_on_missing_key_then_succeeds():
+    transport = ScriptedTransport(
+        [
+            '{"faithful": true, "reason": "r"}',
+            '{"faithful": true, "relevant": true, "reason": "r"}',
+        ]
+    )
+    verdict = _judge(transport, retries=1).verdict("Q ?", PASSAGES, "a", "")
+    assert verdict.relevance is True
+    assert len(transport.prompts) == 2
+
+
+def test_judge_rejects_negative_retries():
+    with pytest.raises(ValueError):
+        _judge(ScriptedTransport([]), retries=-1)
+
+
+def test_verdict_with_whitespace_only_reference_skips_correctness():
+    transport = ScriptedTransport(['{"faithful": true, "relevant": true, "reason": "r"}'])
+    verdict = _judge(transport).verdict("Q ?", PASSAGES, "a", "   \n")
+    assert verdict.correctness is None
+    assert len(transport.prompts) == 1

@@ -59,12 +59,16 @@ class OllamaJudge:
     def __init__(
         self, client: OllamaClient, model: str, max_tokens: int = 200, retries: int = 2
     ) -> None:
+        if retries < 0:
+            raise ValueError(f"Invalid judge: retries={retries}")
         self.client = client
         self.model = model
         self.max_tokens = max_tokens
         self.retries = retries
 
-    def _ask(self, prompt: str, keys: tuple[str, ...]) -> tuple[dict, float]:
+    def _ask(
+        self, prompt: str, keys: tuple[str, ...], bool_keys: tuple[str, ...] = ()
+    ) -> tuple[dict, float]:
         last: JudgeParseError | None = None
         latency = 0.0
         for _ in range(self.retries + 1):
@@ -74,7 +78,10 @@ class OllamaJudge:
             latency += completion.latency_ms
             try:
                 payload = extract_json(completion.text)
-                return ({key: payload[key] for key in keys} | {"raw": completion.text}, latency)
+                result = {key: payload[key] for key in keys}
+                for key in bool_keys:
+                    result[key] = _as_bool(result[key], key, completion.text)
+                return (result, latency)
             except (JudgeParseError, KeyError) as exc:
                 last = (
                     exc
@@ -92,17 +99,19 @@ class OllamaJudge:
 
         if passages:
             prompt = render_grounding_prompt(question, [p.text for p in passages], answer)
-            payload, took = self._ask(prompt, ("faithful", "relevant", "reason"))
+            payload, took = self._ask(
+                prompt, ("faithful", "relevant", "reason"), bool_keys=("faithful", "relevant")
+            )
             latency += took
-            faithfulness = _as_bool(payload["faithful"], "faithful", payload["raw"])
-            relevance = _as_bool(payload["relevant"], "relevant", payload["raw"])
+            faithfulness = payload["faithful"]
+            relevance = payload["relevant"]
             rationales["faithfulness"] = str(payload["reason"])
 
-        if reference:
+        if reference.strip():
             prompt = render_correctness_prompt(question, answer, reference)
-            payload, took = self._ask(prompt, ("correct", "reason"))
+            payload, took = self._ask(prompt, ("correct", "reason"), bool_keys=("correct",))
             latency += took
-            correctness = _as_bool(payload["correct"], "correct", payload["raw"])
+            correctness = payload["correct"]
             rationales["correctness"] = str(payload["reason"])
 
         return Verdict(faithfulness, relevance, correctness, rationales, latency)
