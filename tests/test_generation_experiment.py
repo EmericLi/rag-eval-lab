@@ -3,7 +3,7 @@ import json
 import logging
 
 from rag_eval_lab import generation_experiment
-from rag_eval_lab.generation_config import GenerationConfig
+from rag_eval_lab.generation_config import ContextConfig, GenerationConfig
 from rag_eval_lab.generation_experiment import (
     _append,
     _completed_ids,
@@ -186,13 +186,15 @@ def test_run_generation_records_unexpected_exceptions_and_continues(
     real = generation_experiment.build_context_sources
 
     def with_exploding(cfg, dataset):
-        return [ExplodingContext(), *real(cfg, dataset)]
+        return [ExplodingContext() if s.name == "boom" else s for s in real(cfg, dataset)]
 
     monkeypatch.setattr(generation_experiment, "build_context_sources", with_exploding)
+    cfg = _config(mini_jsonl, tmp_path)
+    cfg = cfg.model_copy(
+        update={"contexts": [ContextConfig(name="boom", kind="empty"), *cfg.contexts]}
+    )
     with caplog.at_level(logging.ERROR):
-        records = run_generation(
-            _config(mini_jsonl, tmp_path), tmp_path / "out", client=_client(FakeTransport())
-        )
+        records = run_generation(cfg, tmp_path / "out", client=_client(FakeTransport()))
     boom = [r for r in records if r["context"] == "boom"]
     assert len(boom) == 2
     assert {r["status"] for r in boom} == {"error"}

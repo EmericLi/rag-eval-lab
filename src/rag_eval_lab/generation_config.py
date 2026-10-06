@@ -85,7 +85,27 @@ class GenerationConfig(BaseModel):
         return self
 
     def answer_id(self, context_name: str, query_id: str) -> str:
-        return make_key(context_name, query_id, self.generator.model, PROMPT_VERSION)[:12]
+        """Resume key covering everything that shapes the answer, not just the context name.
+
+        Editing a context's definition (or the generator settings) without renaming it
+        therefore yields new ids, so a resumed run regenerates instead of reusing stale answers.
+        """
+        context = next((c for c in self.contexts if c.name == context_name), None)
+        if context is None:
+            raise ValueError(f"unknown context '{context_name}'")
+        return make_key(
+            context_name,
+            context.kind,
+            str(context.chunker),
+            str(context.retriever),
+            str(self.n_passages),
+            self.oracle_chunker,
+            query_id,
+            self.generator.model,
+            str(self.generator.temperature),
+            str(self.generator.max_tokens),
+            PROMPT_VERSION,
+        )[:12]
 
 
 def load_generation_config(path: Path) -> GenerationConfig:

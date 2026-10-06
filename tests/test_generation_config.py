@@ -41,6 +41,35 @@ def test_answer_id_is_stable_and_discriminates():
     assert first != _config(generator={"model": "llama3.1:8B"}).answer_id("bm25", "q1")
 
 
+def _with_context(**changes) -> GenerationConfig:
+    contexts = [dict(c) for c in BASE["contexts"]]
+    contexts[1].update(changes)
+    return _config(contexts=contexts)
+
+
+def test_answer_id_changes_when_a_context_definition_changes_without_renaming():
+    base = _config().answer_id("bm25", "q1")
+    assert _with_context(retriever="bm25").answer_id("bm25", "q1") == base
+    assert _with_context(retriever="dense:hashing").answer_id("bm25", "q1") != base
+    assert _with_context(chunker="fixed_200_50").answer_id("bm25", "q1") != base
+
+
+def test_answer_id_changes_with_n_passages_and_generator_settings():
+    base = _config().answer_id("bm25", "q1")
+    assert _config(n_passages=3).answer_id("bm25", "q1") != base
+    assert _config(oracle_chunker="fixed_200_50").answer_id("oracle", "q1") != _config().answer_id(
+        "oracle", "q1"
+    )
+    generator = BASE["generator"]
+    assert _config(generator={**generator, "temperature": 0.7}).answer_id("bm25", "q1") != base
+    assert _config(generator={**generator, "max_tokens": 100}).answer_id("bm25", "q1") != base
+
+
+def test_answer_id_rejects_an_unknown_context():
+    with pytest.raises(ValueError, match="nope"):
+        _config().answer_id("nope", "q1")
+
+
 def test_retrieved_context_requires_chunker_and_retriever():
     with pytest.raises(ValidationError, match="retrieved"):
         _config(contexts=[{"name": "x", "kind": "retrieved", "chunker": "none"}])
