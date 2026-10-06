@@ -33,10 +33,19 @@ def build_dataset(cfg: GenerationConfig) -> Dataset:
     return Dataset(name=base.name, documents=base.documents, queries=queries, qrels=qrels)
 
 
-def build_context_sources(cfg: GenerationConfig, dataset: Dataset) -> list[ContextSource]:
+def build_context_sources(
+    cfg: GenerationConfig, dataset: Dataset, only: set[str] | None = None
+) -> list[ContextSource]:
+    """Build the context sources in config order; `only` restricts it to those names.
+
+    Retrieved contexts are indexed here, which is the expensive step, so callers with
+    nothing left to generate for a context should leave it out of `only`.
+    """
     cache = EmbeddingCache(Path(cfg.cache_dir))
     sources: list[ContextSource] = []
     for context in cfg.contexts:
+        if only is not None and context.name not in only:
+            continue
         if context.kind == "empty":
             sources.append(EmptyContext(context.name))
         elif context.kind == "oracle":
@@ -110,7 +119,14 @@ def run_generation(
         client, cfg.generator.model, cfg.generator.max_tokens, cfg.generator.temperature
     )
     dataset = dataset or build_dataset(cfg)
-    sources = build_context_sources(cfg, dataset)
+
+    # Resume check first: only contexts with pending items are built (and indexed).
+    pending = {
+        context.name
+        for context in cfg.contexts
+        if any(cfg.answer_id(context.name, q.id) not in done for q in dataset.queries)
+    }
+    sources = build_context_sources(cfg, dataset, only=pending) if pending else []
 
     records: list[dict] = []
     for source in sources:

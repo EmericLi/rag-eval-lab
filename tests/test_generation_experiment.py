@@ -11,6 +11,7 @@ from rag_eval_lab.generation_experiment import (
     run_generation,
 )
 from rag_eval_lab.ollama_client import OllamaClient
+from rag_eval_lab.pipeline import RetrievalPipeline
 
 
 class FakeTransport:
@@ -185,8 +186,8 @@ def test_run_generation_records_unexpected_exceptions_and_continues(
 ):
     real = generation_experiment.build_context_sources
 
-    def with_exploding(cfg, dataset):
-        return [ExplodingContext() if s.name == "boom" else s for s in real(cfg, dataset)]
+    def with_exploding(cfg, dataset, only=None):
+        return [ExplodingContext() if s.name == "boom" else s for s in real(cfg, dataset, only)]
 
     monkeypatch.setattr(generation_experiment, "build_context_sources", with_exploding)
     cfg = _config(mini_jsonl, tmp_path)
@@ -212,3 +213,53 @@ def test_expected_ollama_errors_are_logged_without_a_traceback(mini_jsonl, tmp_p
         )
     assert "generation failed for none" in caplog.text
     assert "Traceback" not in caplog.text
+
+
+def _count_indexing(monkeypatch):
+    calls = []
+    real_index = RetrievalPipeline.index
+
+    def counting(self, documents):
+        calls.append(self)
+        return real_index(self, documents)
+
+    monkeypatch.setattr(RetrievalPipeline, "index", counting)
+    return calls
+
+
+def test_a_complete_run_indexes_nothing_on_resume(mini_jsonl, tmp_path, monkeypatch):
+    out = tmp_path / "out"
+    cfg = _config(mini_jsonl, tmp_path)
+    run_generation(cfg, out, client=_client(FakeTransport()))
+    calls = _count_indexing(monkeypatch)
+    transport = FakeTransport()
+    assert run_generation(cfg, out, client=_client(transport)) == []
+    assert calls == []
+    assert transport.prompts == []
+
+
+def test_only_contexts_with_pending_answers_are_indexed(mini_jsonl, tmp_path, monkeypatch):
+    out = tmp_path / "out"
+    cfg = _config(
+        mini_jsonl,
+        tmp_path,
+        contexts=[
+            {"name": "bm25", "kind": "retrieved", "chunker": "fixed_200_50", "retriever": "bm25"},
+            {
+                "name": "hashing",
+                "kind": "retrieved",
+                "chunker": "fixed_200_50",
+                "retriever": "dense:hashing",
+            },
+        ],
+    )
+    run_generation(cfg, out, client=_client(FakeTransport()))
+    path = out / "answers.jsonl"
+    kept = [line for line in path.read_text(encoding="utf-8").splitlines() if '"bm25"' in line]
+    path.write_text("\n".join(kept) + "\n", encoding="utf-8")
+
+    calls = _count_indexing(monkeypatch)
+    records = run_generation(cfg, out, client=_client(FakeTransport()))
+    assert len(calls) == 1
+    assert {r["context"] for r in records} == {"hashing"}
+    assert len(records) == 2
