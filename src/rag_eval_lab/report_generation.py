@@ -58,24 +58,36 @@ def summarise(answers: list[dict], judgments: list[dict]) -> list[dict]:
     return rows
 
 
-def _plot(rows: list[dict], path: Path) -> None:
+def _draw(rows: list[dict], ax) -> None:
+    """Draw the bars; a criterion that does not apply (None) gets an `n/a` mark, not a bar."""
     contexts = [row["context"] for row in rows]
-    fig, ax = plt.subplots(figsize=(9, 5))
     width = 0.35
-    positions = range(len(rows))
-    faithful = [(row["faithfulness_rate"] or 0.0) for row in rows]
-    correct = [(row["correctness_rate"] or 0.0) for row in rows]
-    ax.bar(
-        [p - width / 2 for p in positions], faithful, width, label="faithfulness", color="#9aa5b1"
-    )
-    ax.bar([p + width / 2 for p in positions], correct, width, label="correctness", color="#2563eb")
-    ax.set_xticks(list(positions))
+    positions = list(range(len(rows)))
+    faith_x = [p - width / 2 for p, row in zip(positions, rows, strict=True)]
+    corr_x = [p + width / 2 for p, row in zip(positions, rows, strict=True)]
+    faith_bars = [(x, row["faithfulness_rate"]) for x, row in zip(faith_x, rows, strict=True)]
+    corr_bars = [(x, row["correctness_rate"]) for x, row in zip(corr_x, rows, strict=True)]
+    for series, label, color in (
+        (faith_bars, "faithfulness", "#9aa5b1"),
+        (corr_bars, "correctness", "#2563eb"),
+    ):
+        drawn = [(x, rate) for x, rate in series if rate is not None]
+        ax.bar([x for x, _ in drawn], [rate for _, rate in drawn], width, label=label, color=color)
+        for x, rate in series:
+            if rate is None:
+                ax.text(x, 0.02, "n/a", ha="center", va="bottom", color="#52606d", fontsize=9)
+    ax.set_xticks(positions)
     ax.set_xticklabels(contexts, rotation=20, ha="right")
     ax.set_ylim(0, 1)
     ax.set_ylabel("rate")
     ax.set_title("Answer quality by context")
     ax.grid(axis="y", alpha=0.3)
     ax.legend()
+
+
+def _plot(rows: list[dict], path: Path) -> None:
+    fig, ax = plt.subplots(figsize=(9, 5))
+    _draw(rows, ax)
     fig.tight_layout()
     fig.savefig(path, dpi=150)
     plt.close(fig)
@@ -87,6 +99,8 @@ def _format(value: float | None) -> str:
 
 def _format_kappa(stats: dict) -> str:
     """Kappa is mathematically undefined when either rater never varies."""
+    if stats["n"] == 0:
+        return "n/a"
     if stats["judge_positive_rate"] in (0.0, 1.0) or stats["human_positive_rate"] in (0.0, 1.0):
         return "undefined"
     return f"{stats['kappa']:.3f}"
@@ -131,12 +145,25 @@ def build_generation_report(out_dir: Path) -> Path:
     ]
     for criterion, stats in calibration.items():
         cells = stats["confusion"]
+        if stats["n"] == 0:
+            # Nothing measured: the zeros returned by agreement() must not read as a bad judge.
+            agreement_cell = judge_cell = human_cell = ci_cell = "n/a"
+        else:
+            agreement_cell = f"{stats['agreement']:.3f}"
+            judge_cell = f"{stats['judge_positive_rate']:.3f}"
+            human_cell = f"{stats['human_positive_rate']:.3f}"
+            ci_cell = f"[{stats['ci_low']:.3f}, {stats['ci_high']:.3f}]"
         lines.append(
-            f"| {criterion} | {stats['n']} | {stats['agreement']:.3f} | "
-            f"[{stats['ci_low']:.3f}, {stats['ci_high']:.3f}] | {_format_kappa(stats)} | "
-            f"{stats['judge_positive_rate']:.3f} | {stats['human_positive_rate']:.3f} | "
+            f"| {criterion} | {stats['n']} | {agreement_cell} | {ci_cell} | "
+            f"{_format_kappa(stats)} | {judge_cell} | {human_cell} | "
             f"{cells['tp']}/{cells['fp']}/{cells['fn']}/{cells['tn']} |"
         )
+    if not annotations:
+        lines += [
+            "",
+            "The judge has not been calibrated yet: no human annotations. "
+            "Run `rel annotate` to label answers, then regenerate this report.",
+        ]
     lines += [
         "",
         "## Notes",
@@ -151,6 +178,8 @@ def build_generation_report(out_dir: Path) -> Path:
         "  answer (positive rate of exactly 0 or 1): chance agreement is then total and kappa",
         "  has no meaningful value. This is not the same as a kappa of 0, which would mean the",
         "  judge is no better than chance.",
+        "- A calibration row with n = 0 reads `n/a` throughout: nothing was measured, which is",
+        "  not the same as a judge that never agrees.",
         "",
     ]
     _plot(rows, out_dir / "generation.png")
