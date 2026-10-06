@@ -89,7 +89,7 @@ Nouveaux modules dans `src/rag_eval_lab/` :
 | `ollama_client.py` | Client HTTP vers `127.0.0.1:11434` (bibliothèque standard), délai d'attente, relances, sortie JSON forcée, lecture de l'empreinte du modèle | `generate(model, prompt, ...) -> Completion`, `model_digest(model) -> str` |
 | `generation.py` | `OllamaGenerator` : rendu du prompt, appel, mesure de latence | `Generator.answer(query, passages) -> Answer` |
 | `judging.py` | `OllamaJudge` : deux appels par réponse — fidélité + pertinence (avec passages), justesse (avec réponse du prof) ; sortie JSON stricte | `Judge.verdict(answer, sample) -> Verdict` |
-| `prompts.py` | Gabarits et `PROMPT_VERSION` (hachage du contenu des gabarits) | `render_answer_prompt()`, `render_grounding_prompt()`, `render_correctness_prompt()` |
+| `prompts.py` | Gabarits, `ANSWER_PROMPT_VERSION` et `JUDGE_PROMPT_VERSION` (hachages du contenu des gabarits de réponse, resp. de jugement) | `render_answer_prompt()`, `render_grounding_prompt()`, `render_correctness_prompt()` |
 | `annotation.py` | Tirage équilibré des exemples, persistance des verdicts humains | `sample_for_annotation(...)`, `append_annotation(...)` |
 | `calibration.py` | Accord brut, kappa de Cohen, intervalle de confiance de Wilson, matrice de confusion | `agreement(judgments, annotations) -> dict` |
 | `generation_experiment.py` | Orchestration reprenable des deux étapes, isolation des erreurs | `run_generation(cfg, out)`, `run_judging(cfg, out)` |
@@ -142,7 +142,7 @@ de génération et de jugement sur la machine cible, puis fixe la valeur défini
 dans le budget (voir §7).
 
 **`answer_id`** identifie un couple (contexte, question) pour un générateur et une version de
-prompt donnés : `make_key(context_name, query_id, generator_model, PROMPT_VERSION)[:12]`.
+prompt donnés : `make_key(context_name, query_id, generator_model, ANSWER_PROMPT_VERSION)[:12]`.
 C'est la clé de reprise de `rel generate`, et la clé de jointure des trois fichiers.
 
 Enregistrements :
@@ -209,7 +209,7 @@ réponses fidèles.
 
 - client Ollama factice injecté : aucun appel réseau, aucun modèle téléchargé en CI ;
 - rendu des prompts : les passages, la question et la réponse de référence apparaissent aux
-  bons endroits ; `PROMPT_VERSION` change quand un gabarit change ;
+  bons endroits ; `ANSWER_PROMPT_VERSION` change quand un gabarit de réponse change (et pas `JUDGE_PROMPT_VERSION`, qui est seulement inscrite dans les jugements) ;
 - analyse des sorties du juge : JSON valide, JSON avec texte autour, JSON invalide (relance
   puis erreur) ;
 - `ContextSource` : `empty` renvoie zéro passage, `oracle` ne dépend pas de la question et

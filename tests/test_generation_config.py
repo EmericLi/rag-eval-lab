@@ -2,6 +2,7 @@ import pytest
 import yaml
 from pydantic import ValidationError
 
+from rag_eval_lab import generation_config, prompts
 from rag_eval_lab.generation_config import GenerationConfig, load_generation_config
 
 BASE = {
@@ -110,3 +111,14 @@ def test_load_generation_config(tmp_path):
     path = tmp_path / "v2.yaml"
     path.write_text(yaml.safe_dump(BASE), encoding="utf-8")
     assert load_generation_config(path).generator.model == "llama3.2:latest"
+
+
+def test_answer_id_depends_on_the_answer_prompt_version_only(monkeypatch):
+    base = _config().answer_id("bm25", "q1")
+    # Editing a judge prompt must not invalidate any answer.
+    monkeypatch.setattr(prompts, "JUDGE_PROMPT_VERSION", "changed!")
+    assert _config().answer_id("bm25", "q1") == base
+    assert not hasattr(generation_config, "JUDGE_PROMPT_VERSION")
+    # Editing an answer prompt must.
+    monkeypatch.setattr(generation_config, "ANSWER_PROMPT_VERSION", "changed!")
+    assert _config().answer_id("bm25", "q1") != base

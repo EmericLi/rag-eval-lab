@@ -17,7 +17,7 @@ from rag_eval_lab.generation_config import GenerationConfig
 from rag_eval_lab.judging import JudgeParseError, OllamaJudge
 from rag_eval_lab.ollama_client import OllamaClient, OllamaError
 from rag_eval_lab.pipeline import RetrievalPipeline
-from rag_eval_lab.prompts import PROMPT_VERSION
+from rag_eval_lab.prompts import ANSWER_PROMPT_VERSION, JUDGE_PROMPT_VERSION
 from rag_eval_lab.types import Chunk, Dataset
 
 logger = logging.getLogger(__name__)
@@ -141,7 +141,7 @@ def run_generation(
                 "query_id": query.id,
                 "question": query.text,
                 "reference": query.answer,
-                "prompt_version": PROMPT_VERSION,
+                "prompt_version": ANSWER_PROMPT_VERSION,
                 "generator": {
                     "model": cfg.generator.model,
                     "digest": digest,
@@ -210,7 +210,7 @@ def run_judging(
         record = {
             "answer_id": answer["answer_id"],
             "judge": {"model": cfg.judge.model, "digest": digest},
-            "prompt_version": answer.get("prompt_version", ""),
+            "prompt_version": JUDGE_PROMPT_VERSION,
         }
         try:
             passages = [

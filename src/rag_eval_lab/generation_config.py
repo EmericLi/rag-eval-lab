@@ -12,7 +12,7 @@ from rag_eval_lab.cache import make_key
 from rag_eval_lab.chunking import parse_chunker
 from rag_eval_lab.config import DatasetConfig
 from rag_eval_lab.factory import build_retriever
-from rag_eval_lab.prompts import PROMPT_VERSION
+from rag_eval_lab.prompts import ANSWER_PROMPT_VERSION
 
 
 class GeneratorConfig(BaseModel):
@@ -104,7 +104,7 @@ class GenerationConfig(BaseModel):
             self.generator.model,
             str(self.generator.temperature),
             str(self.generator.max_tokens),
-            PROMPT_VERSION,
+            ANSWER_PROMPT_VERSION,
         )[:12]
 
 

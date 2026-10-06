@@ -14,6 +14,7 @@ from rag_eval_lab.generation_experiment import (
 )
 from rag_eval_lab.ollama_client import OllamaClient
 from rag_eval_lab.pipeline import RetrievalPipeline
+from rag_eval_lab.prompts import ANSWER_PROMPT_VERSION, JUDGE_PROMPT_VERSION
 
 
 class FakeTransport:
@@ -307,6 +308,16 @@ def test_run_judging_judges_every_answer(mini_jsonl, tmp_path):
             assert judgment["faithfulness"] is True
         assert judgment["correctness"] is False
         assert judgment["judge"]["digest"] == "0123456789ab"
+
+
+def test_judgments_carry_the_judge_prompt_version_not_the_answers(mini_jsonl, tmp_path):
+    out = tmp_path / "out"
+    cfg = _config(mini_jsonl, tmp_path)
+    answers = run_generation(cfg, out, client=_client(FakeTransport()))
+    judgments = run_judging(cfg, out, client=_client(JudgeTransport()))
+    assert {a["prompt_version"] for a in answers} == {ANSWER_PROMPT_VERSION}
+    assert {j["prompt_version"] for j in judgments} == {JUDGE_PROMPT_VERSION}
+    assert ANSWER_PROMPT_VERSION != JUDGE_PROMPT_VERSION
 
 
 def test_run_judging_resumes(mini_jsonl, tmp_path):

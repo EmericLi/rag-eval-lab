@@ -1,5 +1,6 @@
 from rag_eval_lab.prompts import (
-    PROMPT_VERSION,
+    ANSWER_PROMPT_VERSION,
+    JUDGE_PROMPT_VERSION,
     render_answer_prompt,
     render_correctness_prompt,
     render_grounding_prompt,
@@ -34,8 +35,7 @@ def test_correctness_prompt_contains_the_reference():
     assert "réponse générée" in prompt
 
 
-def test_prompt_version_is_short_and_stable():
-    assert len(PROMPT_VERSION) == 8
-    from rag_eval_lab import prompts
-
-    assert PROMPT_VERSION == prompts.PROMPT_VERSION
+def test_prompt_versions_are_short_and_distinct():
+    assert len(ANSWER_PROMPT_VERSION) == 8
+    assert len(JUDGE_PROMPT_VERSION) == 8
+    assert ANSWER_PROMPT_VERSION != JUDGE_PROMPT_VERSION

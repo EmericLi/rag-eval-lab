@@ -58,7 +58,11 @@ Réponds en JSON strict avec exactement ces clés :
 
 JSON :"""
 
-PROMPT_VERSION = make_key(ANSWER_WITH_CONTEXT, ANSWER_WITHOUT_CONTEXT, GROUNDING, CORRECTNESS)[:8]
+ANSWER_PROMPT_VERSION = make_key(ANSWER_WITH_CONTEXT, ANSWER_WITHOUT_CONTEXT)[:8]
+"""Part of the answer id: editing an answer template makes answers regenerate."""
+
+JUDGE_PROMPT_VERSION = make_key(GROUNDING, CORRECTNESS)[:8]
+"""Stamped on judgments only: editing a judge template never changes an answer id."""
 
 
 def _numbered(passages: list[str]) -> str:
