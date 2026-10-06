@@ -10,7 +10,7 @@ from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 
-from rag_eval_lab.generation_experiment import load_answers
+from rag_eval_lab.generation_experiment import _guarded_append_json_line, load_answers
 
 logger = logging.getLogger(__name__)
 
@@ -67,8 +67,7 @@ def load_annotations(out_dir: Path) -> list[dict]:
 def append_annotation(out_dir: Path, record: dict) -> None:
     path = Path(out_dir) / "annotations.jsonl"
     path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("a", encoding="utf-8") as handle:
-        handle.write(json.dumps(record, ensure_ascii=False) + "\n")
+    _guarded_append_json_line(path, record)
 
 
 def _passage_view(text: str, full: bool) -> str:

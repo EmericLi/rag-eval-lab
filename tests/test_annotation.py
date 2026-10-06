@@ -213,3 +213,27 @@ def test_load_annotations_skips_lines_without_answer_id(tmp_path):
     with (tmp_path / "annotations.jsonl").open("a", encoding="utf-8") as handle:
         handle.write('{"faithfulness": true}' + NL + "[1, 2]" + NL)
     assert [r["answer_id"] for r in load_annotations(tmp_path)] == ["a"]
+
+
+def test_append_after_a_torn_annotation_keeps_records_separate(tmp_path):
+    """After a torn fragment, appending another record keeps both valid records."""
+    append_annotation(tmp_path, {"answer_id": "a", "faithfulness": True, "correctness": False})
+    # Simulate a crash mid-write by appending a torn fragment without a newline
+    with (tmp_path / "annotations.jsonl").open("a", encoding="utf-8") as handle:
+        handle.write('{"answer_id": "b", "faithf')
+    # Append a new record - should skip the torn fragment, keep record a, and add record c
+    append_annotation(tmp_path, {"answer_id": "c", "faithfulness": False, "correctness": True})
+    loaded = {r["answer_id"]: r for r in load_annotations(tmp_path)}
+    assert set(loaded) == {"a", "c"}
+    assert loaded["a"]["faithfulness"] is True
+    assert loaded["c"]["faithfulness"] is False
+
+
+def test_append_does_not_add_blank_line_to_clean_annotation_file(tmp_path):
+    """Appending to a file that already ends with newline must not insert an empty line."""
+    append_annotation(tmp_path, {"answer_id": "a", "faithfulness": True, "correctness": False})
+    append_annotation(tmp_path, {"answer_id": "b", "faithfulness": False, "correctness": True})
+    text = (tmp_path / "annotations.jsonl").read_text(encoding="utf-8")
+    lines = text.splitlines()
+    assert len(lines) == 2
+    assert "\n\n" not in text

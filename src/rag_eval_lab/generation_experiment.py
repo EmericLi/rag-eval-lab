@@ -70,6 +70,23 @@ def build_context_sources(
     return sources
 
 
+def _guarded_append_json_line(path: Path, record: dict) -> None:
+    """Append a JSON record as a line, guarding against torn fragments.
+
+    If the file is non-empty and doesn't end with a newline (from a previous crash),
+    prepend a newline before writing the new record. This ensures each record is
+    on its own line and protects against merging into a torn fragment.
+    """
+    prefix = ""
+    if path.exists() and path.stat().st_size > 0:
+        with path.open("rb") as handle:
+            handle.seek(-1, 2)
+            if handle.read(1) != b"\n":
+                prefix = "\n"  # a crash left an unterminated fragment: do not merge into it
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write(prefix + json.dumps(record, ensure_ascii=False) + "\n")
+
+
 def _completed_ids(path: Path) -> set[str]:
     """Ids of the answers already stored with status "ok".
 
@@ -93,14 +110,8 @@ def _completed_ids(path: Path) -> set[str]:
 
 
 def _append(path: Path, record: dict) -> None:
-    prefix = ""
-    if path.exists() and path.stat().st_size > 0:
-        with path.open("rb") as handle:
-            handle.seek(-1, 2)
-            if handle.read(1) != b"\n":
-                prefix = "\n"  # a crash left an unterminated fragment: do not merge into it
-    with path.open("a", encoding="utf-8") as handle:
-        handle.write(prefix + json.dumps(record, ensure_ascii=False) + "\n")
+    """Append a JSON record to a file, using the guarded append helper."""
+    _guarded_append_json_line(path, record)
 
 
 def run_generation(
