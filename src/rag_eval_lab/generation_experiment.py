@@ -61,20 +61,36 @@ def build_context_sources(cfg: GenerationConfig, dataset: Dataset) -> list[Conte
 
 
 def _completed_ids(path: Path) -> set[str]:
+    """Ids of the answers already stored with status "ok".
+
+    A crash mid-write can leave a truncated line; it is skipped with a warning
+    rather than making the whole run unresumable.
+    """
     if not path.exists():
         return set()
     done = set()
-    for line in path.read_text(encoding="utf-8").splitlines():
-        if line.strip():
+    text = path.read_text(encoding="utf-8", errors="replace")
+    for number, line in enumerate(text.splitlines(), start=1):
+        if not line.strip():
+            continue
+        try:
             record = json.loads(line)
             if record.get("status") == "ok":
                 done.add(record["answer_id"])
+        except (json.JSONDecodeError, AttributeError, KeyError):
+            logger.warning("skipping unreadable line %d of %s", number, path)
     return done
 
 
 def _append(path: Path, record: dict) -> None:
+    prefix = ""
+    if path.exists() and path.stat().st_size > 0:
+        with path.open("rb") as handle:
+            handle.seek(-1, 2)
+            if handle.read(1) != b"\n":
+                prefix = "\n"  # a crash left an unterminated fragment: do not merge into it
     with path.open("a", encoding="utf-8") as handle:
-        handle.write(json.dumps(record, ensure_ascii=False) + "\n")
+        handle.write(prefix + json.dumps(record, ensure_ascii=False) + "\n")
 
 
 def run_generation(
@@ -127,8 +143,11 @@ def run_generation(
                     latency_ms=completion.latency_ms,
                     eval_count=completion.eval_count,
                 )
-            except (OllamaError, ValueError) as exc:
-                logger.exception("generation failed for %s / %s", source.name, query.id)
+            except Exception as exc:  # noqa: BLE001 - one bad item must not stop an unattended run
+                if isinstance(exc, OllamaError):
+                    logger.error("generation failed for %s / %s: %s", source.name, query.id, exc)
+                else:
+                    logger.exception("generation failed for %s / %s", source.name, query.id)
                 record.update(status="error", error=f"{type(exc).__name__}: {exc}")
             record["timestamp"] = datetime.now(UTC).isoformat()
             _append(answers_path, record)
