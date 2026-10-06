@@ -25,7 +25,7 @@ def load_jsonl(directory: Path) -> Dataset:
     qrels: Qrels = {}
     for row in _read_jsonl(directory / "queries.jsonl"):
         qid = str(row["id"])
-        queries.append(Query(qid, row["text"]))
+        queries.append(Query(qid, row["text"], row.get("answer", "")))
         qrels[qid] = {str(doc_id): 1 for doc_id in row["relevant"]}
     return Dataset(name=directory.name, documents=documents, queries=queries, qrels=qrels)
 
@@ -38,7 +38,7 @@ def alloprof_from_rows(doc_rows: Iterable[dict], query_rows: Iterable[dict]) -> 
         qid = str(row["id"])
         if qid in qrels:
             continue
-        queries.append(Query(qid, row["text"]))
+        queries.append(Query(qid, row["text"], row.get("answer", "") or ""))
         qrels[qid] = {doc_id: 1 for doc_id in row["relevant"]}
     return Dataset(name="alloprof", documents=documents, queries=queries, qrels=qrels)
 

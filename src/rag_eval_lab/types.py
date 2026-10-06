@@ -18,6 +18,8 @@ class Document:
 class Query:
     id: str
     text: str
+    answer: str = ""
+    """Reference answer written by a human, when the dataset provides one."""
 
 
 @dataclass(frozen=True)

@@ -69,3 +69,21 @@ def test_pipeline_with_reranker_overrides_first_stage(mini_dataset):
     )
     pipeline.index(mini_dataset.documents)
     assert pipeline.search("Comment expliquer le volcan ?", k=3)[0] == "d5"
+
+
+def test_search_passages_returns_chunk_hits(mini_dataset):
+    pipeline = RetrievalPipeline(FixedChunker(size=200, overlap=50), BM25Retriever())
+    pipeline.index(mini_dataset.documents)
+    hits = pipeline.search_passages("Comment expliquer le volcan ?", k=3)
+    assert len(hits) == 3
+    assert hits[0].chunk.doc_id == "d0"
+    assert "volcan" in hits[0].chunk.text
+    assert [h.score for h in hits] == sorted((h.score for h in hits), reverse=True)
+
+
+def test_search_and_search_passages_agree(mini_dataset):
+    pipeline = RetrievalPipeline(FixedChunker(size=200, overlap=50), BM25Retriever())
+    pipeline.index(mini_dataset.documents)
+    docs = pipeline.search("Comment expliquer le volcan ?", k=3)
+    passages = pipeline.search_passages("Comment expliquer le volcan ?", k=50)
+    assert docs[0] == passages[0].chunk.doc_id

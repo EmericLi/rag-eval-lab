@@ -63,3 +63,39 @@ def test_load_benchmark_jsonl(mini_jsonl):
     cfg = DatasetConfig(name="jsonl", path=str(mini_jsonl), n_queries=2, seed=3)
     dataset = load_benchmark(cfg)
     assert len(dataset.queries) == 2
+
+
+def test_alloprof_rows_keep_the_teacher_answer():
+    docs = [{"uuid": "u1", "title": "Le volcan", "text": "Un volcan est...", "topic": "x"}]
+    queries = [
+        {
+            "id": 7,
+            "text": "c'est quoi un volcan",
+            "relevant": ["u1"],
+            "answer": "Bonjour, un volcan...",
+        }
+    ]
+    dataset = alloprof_from_rows(docs, queries)
+    assert dataset.queries[0].answer == "Bonjour, un volcan..."
+
+
+def test_alloprof_rows_tolerate_a_missing_answer():
+    docs = [{"uuid": "u1", "title": "T", "text": "texte"}]
+    dataset = alloprof_from_rows(docs, [{"id": 1, "text": "q", "relevant": ["u1"]}])
+    assert dataset.queries[0].answer == ""
+
+
+def test_load_jsonl_reads_an_optional_answer(tmp_path):
+    directory = tmp_path / "mini"
+    directory.mkdir()
+    (directory / "corpus.jsonl").write_text('{"id": "d1", "text": "texte"}\n', encoding="utf-8")
+    (directory / "queries.jsonl").write_text(
+        '{"id": "q1", "text": "question", "relevant": ["d1"], "answer": "ref"}\n', encoding="utf-8"
+    )
+    dataset = load_jsonl(directory)
+    assert dataset.queries[0].answer == "ref"
+
+
+def test_mini_jsonl_round_trips_the_reference_answer(mini_jsonl):
+    dataset = load_jsonl(mini_jsonl)
+    assert dataset.queries[0].answer == "Le volcan est un sujet important."

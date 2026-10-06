@@ -37,7 +37,14 @@ def _doc_text(topic: str) -> str:
 @pytest.fixture
 def mini_dataset() -> Dataset:
     documents = [Document(id=f"d{i}", text=_doc_text(t)) for i, t in enumerate(TOPICS)]
-    queries = [Query(id=f"q{i}", text=f"Comment expliquer le {TOPICS[i]} ?") for i in range(5)]
+    queries = [
+        Query(
+            id=f"q{i}",
+            text=f"Comment expliquer le {TOPICS[i]} ?",
+            answer=f"Le {TOPICS[i]} est un sujet important.",
+        )
+        for i in range(5)
+    ]
     qrels = {f"q{i}": {f"d{i}": 1} for i in range(5)}
     return Dataset(name="mini", documents=documents, queries=queries, qrels=qrels)
 
@@ -52,5 +59,11 @@ def mini_jsonl(tmp_path: Path, mini_dataset: Dataset) -> Path:
     with (directory / "queries.jsonl").open("w", encoding="utf-8") as f:
         for q in mini_dataset.queries:
             relevant = list(mini_dataset.qrels[q.id])
-            f.write(json.dumps({"id": q.id, "text": q.text, "relevant": relevant}) + "\n")
+            f.write(
+                json.dumps(
+                    {"id": q.id, "text": q.text, "relevant": relevant, "answer": q.answer},
+                    ensure_ascii=False,
+                )
+                + "\n"
+            )
     return directory

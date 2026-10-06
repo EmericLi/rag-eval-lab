@@ -39,8 +39,13 @@ class RetrievalPipeline:
         if self.reranker is not None:
             self.reranker.load()
 
-    def search(self, query: str, k: int) -> list[str]:
+    def search_passages(self, query: str, k: int) -> list[Hit]:
+        """Top-k chunk hits, after reranking when a reranker is configured."""
         hits = self.retriever.search(query, max(self.candidates, k))
         if self.reranker is not None:
             hits = self.reranker.rerank(query, hits, len(hits))
+        return hits[:k]
+
+    def search(self, query: str, k: int) -> list[str]:
+        hits = self.search_passages(query, max(self.candidates, k))
         return aggregate_to_docs(hits, k)
