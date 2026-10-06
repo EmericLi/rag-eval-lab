@@ -51,6 +51,10 @@ passages hors sujet est fidèle **et** fausse. Réserve à documenter dans le ra
 réponses de prof sont conversationnelles et parfois partielles, donc ce critère mesure
 l'accord avec une réponse humaine, pas une vérité absolue.
 
+Pour le contexte `empty`, aucun passage n'est fourni : la fidélité et la pertinence n'ont pas
+de sens et valent `null`. Seule la justesse est jugée. Les `null` sont exclus des moyennes et
+des calculs d'accord.
+
 **L'humain annote la fidélité et la justesse** (la pertinence est presque toujours vraie et
 n'apporte pas d'information).
 
@@ -143,8 +147,9 @@ C'est la clé de reprise de `rel generate`, et la clé de jointure des trois fic
 
 Enregistrements :
 
-- `answers.jsonl` : `answer_id`, `context`, `query_id`, `question`, `answer`, `passage_ids`,
-  `n_passage_chars`, `latency_ms`, `generator` (modèle, empreinte, options), `prompt_version`,
+- `answers.jsonl` : `answer_id`, `context`, `query_id`, `question`, `reference` (réponse du
+  prof), `answer`, `passages` (liste de `{id, text}` — le texte est stocké pour que juger et
+  annoter n'aient besoin ni de pipeline ni du jeu de données), `n_passage_chars`, `latency_ms`, `generator` (modèle, empreinte, options), `prompt_version`,
   `status`, `timestamp` ; en cas d'échec : `error`.
 - `judgments.jsonl` : `answer_id`, `judge` (modèle, empreinte), `prompt_version`,
   `faithfulness`, `relevance`, `correctness` (booléens), `rationales` (trois chaînes courtes),
