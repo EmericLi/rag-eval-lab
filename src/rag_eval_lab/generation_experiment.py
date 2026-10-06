@@ -14,10 +14,11 @@ from rag_eval_lab.data import load_benchmark
 from rag_eval_lab.factory import build_retriever
 from rag_eval_lab.generation import OllamaGenerator
 from rag_eval_lab.generation_config import GenerationConfig
+from rag_eval_lab.judging import JudgeParseError, OllamaJudge
 from rag_eval_lab.ollama_client import OllamaClient, OllamaError
 from rag_eval_lab.pipeline import RetrievalPipeline
 from rag_eval_lab.prompts import PROMPT_VERSION
-from rag_eval_lab.types import Dataset
+from rag_eval_lab.types import Chunk, Dataset
 
 logger = logging.getLogger(__name__)
 
@@ -170,4 +171,77 @@ def run_generation(
             records.append(record)
             if n % 10 == 0:
                 logger.info("context %s: %d/%d", source.name, n, len(dataset.queries))
+    return records
+
+
+def load_answers(out_dir: Path) -> list[dict]:
+    """Last record per answer_id, successful ones only; unreadable lines are skipped."""
+    path = Path(out_dir) / "answers.jsonl"
+    latest: dict[str, dict] = {}
+    if path.exists():
+        text = path.read_text(encoding="utf-8", errors="replace")
+        for number, line in enumerate(text.splitlines(), start=1):
+            if not line.strip():
+                continue
+            try:
+                record = json.loads(line)
+                latest[record["answer_id"]] = record
+            except (json.JSONDecodeError, TypeError, KeyError):
+                logger.warning("skipping unreadable line %d of %s", number, path)
+    return [r for r in latest.values() if r.get("status") == "ok"]
+
+
+def run_judging(
+    cfg: GenerationConfig, out_dir: Path, client: OllamaClient | None = None
+) -> list[dict]:
+    """Judge every successful answer not yet judged; the reference comes from the answer record."""
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    judgments_path = out_dir / "judgments.jsonl"
+    done = _completed_ids(judgments_path)
+
+    client = client or OllamaClient(timeout_s=cfg.judge.timeout_s)
+    digest = client.model_digest(cfg.judge.model)
+    judge = OllamaJudge(client, cfg.judge.model, cfg.judge.max_tokens)
+
+    records: list[dict] = []
+    answers = [a for a in load_answers(out_dir) if a["answer_id"] not in done]
+    for n, answer in enumerate(answers, start=1):
+        record = {
+            "answer_id": answer["answer_id"],
+            "judge": {"model": cfg.judge.model, "digest": digest},
+            "prompt_version": answer.get("prompt_version", ""),
+        }
+        try:
+            passages = [
+                Chunk(p["id"], p["id"].split("#")[0], p["text"]) for p in answer["passages"]
+            ]
+            verdict = judge.verdict(
+                answer["question"], passages, answer["answer"], answer.get("reference", "")
+            )
+            record.update(
+                status="ok",
+                faithfulness=verdict.faithfulness,
+                relevance=verdict.relevance,
+                correctness=verdict.correctness,
+                rationales=verdict.rationales,
+                latency_ms=verdict.latency_ms,
+            )
+        except Exception as exc:  # noqa: BLE001 - one bad item must not stop an unattended run
+            if isinstance(exc, JudgeParseError):
+                logger.warning("judge parse error on %s", answer["answer_id"])
+            elif isinstance(exc, OllamaError):
+                logger.error("judge call failed on %s: %s", answer["answer_id"], exc)
+            else:
+                logger.exception("judge failed on %s", answer["answer_id"])
+            record.update(
+                status="error",
+                error=f"{type(exc).__name__}: {exc}",
+                raw_output=getattr(exc, "raw_output", ""),
+            )
+        record["timestamp"] = datetime.now(UTC).isoformat()
+        _append(judgments_path, record)
+        records.append(record)
+        if n % 10 == 0:
+            logger.info("judged %d/%d", n, len(answers))
     return records

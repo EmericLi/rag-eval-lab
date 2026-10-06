@@ -8,7 +8,9 @@ from rag_eval_lab.generation_experiment import (
     _append,
     _completed_ids,
     build_dataset,
+    load_answers,
     run_generation,
+    run_judging,
 )
 from rag_eval_lab.ollama_client import OllamaClient
 from rag_eval_lab.pipeline import RetrievalPipeline
@@ -263,3 +265,122 @@ def test_only_contexts_with_pending_answers_are_indexed(mini_jsonl, tmp_path, mo
     assert len(calls) == 1
     assert {r["context"] for r in records} == {"hashing"}
     assert len(records) == 2
+
+
+class JudgeTransport:
+    def __init__(self, bad_json_for=(), raise_exc=None):
+        self.bad_json_for = bad_json_for
+        self.raise_exc = raise_exc
+        self.prompts = []
+
+    def __call__(self, method, path, payload):
+        if path == "/api/tags":
+            return {"models": [{"name": "fake-model", "digest": "0123456789abcdef"}]}
+        prompt = payload["prompt"]
+        self.prompts.append(prompt)
+        if self.raise_exc is not None:
+            raise self.raise_exc
+        if any(marker in prompt for marker in self.bad_json_for):
+            return {"response": "je ne sais pas"}
+        if "faithful" in prompt:
+            return {"response": '{"faithful": true, "relevant": true, "reason": "ok"}'}
+        return {"response": '{"correct": false, "reason": "non"}'}
+
+
+def test_run_judging_judges_every_answer(mini_jsonl, tmp_path):
+    out = tmp_path / "out"
+    cfg = _config(mini_jsonl, tmp_path)
+    run_generation(cfg, out, client=_client(FakeTransport()))
+    records = run_judging(cfg, out, client=_client(JudgeTransport()))
+    assert len(records) == 6
+    assert {r["status"] for r in records} == {"ok"}
+    by_context = {
+        json.loads(line)["answer_id"]: json.loads(line)
+        for line in (out / "judgments.jsonl").read_text(encoding="utf-8").splitlines()
+    }
+    answers = {a["answer_id"]: a for a in load_answers(out)}
+    for answer_id, judgment in by_context.items():
+        if answers[answer_id]["context"] == "none":
+            assert judgment["faithfulness"] is None
+            assert judgment["relevance"] is None
+        else:
+            assert judgment["faithfulness"] is True
+        assert judgment["correctness"] is False
+        assert judgment["judge"]["digest"] == "0123456789ab"
+
+
+def test_run_judging_resumes(mini_jsonl, tmp_path):
+    out = tmp_path / "out"
+    cfg = _config(mini_jsonl, tmp_path)
+    run_generation(cfg, out, client=_client(FakeTransport()))
+    run_judging(cfg, out, client=_client(JudgeTransport()))
+    assert run_judging(cfg, out, client=_client(JudgeTransport())) == []
+
+
+def test_run_judging_records_parse_errors(mini_jsonl, tmp_path):
+    out = tmp_path / "out"
+    cfg = _config(mini_jsonl, tmp_path)
+    run_generation(cfg, out, client=_client(FakeTransport()))
+    records = run_judging(cfg, out, client=_client(JudgeTransport(bad_json_for=("faithful",))))
+    failed = [r for r in records if r["status"] == "error"]
+    assert failed, "grounding calls should have failed"
+    assert failed[0]["raw_output"] == "je ne sais pas"
+    assert all(
+        r["status"] == "ok"
+        for r in records
+        if r["answer_id"] not in {f["answer_id"] for f in failed}
+    )
+
+
+def test_load_answers_keeps_only_successful_records(mini_jsonl, tmp_path):
+    out = tmp_path / "out"
+    cfg = _config(mini_jsonl, tmp_path)
+    run_generation(cfg, out, client=_client(FakeTransport(fail_on=("connaissances",))))
+    answers = load_answers(out)
+    assert {a["context"] for a in answers} == {"bm25", "oracle"}
+
+
+def test_load_answers_skips_unreadable_lines_and_keeps_the_last_record(tmp_path):
+    out = tmp_path / "out"
+    out.mkdir()
+    lines = [
+        json.dumps({"answer_id": "a", "status": "error"}),
+        json.dumps({"answer_id": "a", "status": "ok", "answer": "x"}),
+        '{"answer_id": "b", "sta',
+        json.dumps({"answer_id": "c", "status": "ok"}),
+        json.dumps({"answer_id": "c", "status": "error"}),
+    ]
+    (out / "answers.jsonl").write_text("\n".join(lines), encoding="utf-8")
+    assert [a["answer_id"] for a in load_answers(out)] == ["a"]
+
+
+def test_run_judging_retries_failed_judgments_on_resume(mini_jsonl, tmp_path):
+    out = tmp_path / "out"
+    cfg = _config(mini_jsonl, tmp_path)
+    run_generation(cfg, out, client=_client(FakeTransport()))
+    first = run_judging(cfg, out, client=_client(JudgeTransport(bad_json_for=("faithful",))))
+    failed = {r["answer_id"] for r in first if r["status"] == "error"}
+    retried = run_judging(cfg, out, client=_client(JudgeTransport()))
+    assert {r["answer_id"] for r in retried} == failed
+    assert {r["status"] for r in retried} == {"ok"}
+
+
+def test_run_judging_survives_unexpected_errors(mini_jsonl, tmp_path):
+    out = tmp_path / "out"
+    cfg = _config(mini_jsonl, tmp_path)
+    run_generation(cfg, out, client=_client(FakeTransport()))
+    transport = JudgeTransport(raise_exc=http.client.IncompleteRead(b"par"))
+    records = run_judging(cfg, out, client=_client(transport))
+    assert len(records) == 6
+    assert {r["status"] for r in records} == {"error"}
+    assert all(r["error"].startswith("IncompleteRead") for r in records)
+    assert all(r["raw_output"] == "" for r in records)
+
+
+def test_run_judging_uses_the_reference_stored_in_the_answer(mini_jsonl, tmp_path):
+    out = tmp_path / "out"
+    cfg = _config(mini_jsonl, tmp_path)
+    run_generation(cfg, out, client=_client(FakeTransport()))
+    transport = JudgeTransport()
+    run_judging(cfg, out, client=_client(transport))
+    assert any("Le volcan est un sujet important." in p for p in transport.prompts)
