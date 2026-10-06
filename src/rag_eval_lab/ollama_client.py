@@ -41,6 +41,14 @@ def _http_transport(host: str, timeout_s: float) -> Transport:
     return transport
 
 
+def _error_body(exc: urllib.error.HTTPError, limit: int = 300) -> str:
+    try:
+        body = exc.read().decode("utf-8", errors="replace").strip()
+    except Exception:  # the body is best-effort context only
+        body = ""
+    return body[:limit] or "<empty body>"
+
+
 class OllamaClient:
     def __init__(
         self,
@@ -59,7 +67,13 @@ class OllamaClient:
         for _ in range(self.retries + 1):
             try:
                 return self._transport(method, path, payload)
-            except (urllib.error.URLError, TimeoutError, OSError) as exc:
+            except urllib.error.HTTPError as exc:
+                if exc.code < 500:
+                    raise OllamaError(
+                        f"Ollama returned HTTP {exc.code} for {path}: {_error_body(exc)}"
+                    ) from exc
+                last = exc  # 5xx: transient server-side failure, retry
+            except OSError as exc:  # URLError and TimeoutError are OSError subclasses
                 last = exc
         raise OllamaError(
             f"cannot reach Ollama at {self.host} ({last}). Start it with `ollama serve`."

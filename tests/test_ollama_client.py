@@ -1,3 +1,6 @@
+import io
+import urllib.error
+
 import pytest
 
 from rag_eval_lab.ollama_client import Completion, OllamaClient, OllamaError
@@ -59,6 +62,36 @@ def test_generate_raises_after_exhausting_retries():
     transport = FakeTransport({"/api/generate": {"response": "ok"}}, fail_times=5)
     with pytest.raises(OllamaError, match="ollama serve"):
         OllamaClient(transport=transport, retries=1).generate("m", "p")
+
+
+def _http_error(code, body=b""):
+    return urllib.error.HTTPError(
+        url="http://x/api/generate",
+        code=code,
+        msg="error",
+        hdrs=None,
+        fp=io.BytesIO(body),
+    )
+
+
+def test_http_404_is_not_retried_and_reports_the_body():
+    error = _http_error(404, b'{"error":"model not found"}')
+    transport = FakeTransport({}, fail_times=5, error=error)
+    with pytest.raises(OllamaError) as excinfo:
+        OllamaClient(transport=transport, retries=2).generate("m", "p")
+    message = str(excinfo.value)
+    assert "404" in message
+    assert "model not found" in message
+    assert "ollama serve" not in message
+    assert len(transport.calls) == 1
+
+
+def test_http_500_is_retried_then_reports_unreachable():
+    error = _http_error(500, b"boom")
+    transport = FakeTransport({}, fail_times=10, error=error)
+    with pytest.raises(OllamaError, match="ollama serve"):
+        OllamaClient(transport=transport, retries=2).generate("m", "p")
+    assert len(transport.calls) == 3
 
 
 def test_generate_rejects_a_response_without_text():
