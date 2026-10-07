@@ -11,9 +11,11 @@ class ScriptedTransport:
     def __init__(self, responses):
         self.responses = list(responses)
         self.prompts = []
+        self.options = []
 
     def __call__(self, method, path, payload):
         self.prompts.append(payload["prompt"])
+        self.options.append(payload["options"])
         return {"response": self.responses.pop(0)}
 
 
@@ -44,6 +46,23 @@ def test_verdict_combines_both_calls():
     assert verdict.rationales["correctness"] == "contredit la référence"
     assert verdict.latency_ms > 0
     assert len(transport.prompts) == 2
+
+
+def test_every_judge_call_sends_the_configured_context_window():
+    transport = ScriptedTransport(
+        [
+            '{"faithful": true, "relevant": true, "reason": "ok"}',
+            '{"correct": true, "reason": "ok"}',
+        ]
+    )
+    _judge(transport, num_ctx=4096).verdict("Q ?", PASSAGES, "une réponse", "la référence")
+    assert [o["num_ctx"] for o in transport.options] == [4096, 4096]
+
+
+def test_judge_defaults_to_an_explicit_8192_window():
+    transport = ScriptedTransport(['{"correct": true, "reason": "ok"}'])
+    _judge(transport).verdict("Q ?", [], "une réponse", "la référence")
+    assert transport.options[0]["num_ctx"] == 8192
 
 
 def test_verdict_without_passages_skips_grounding():

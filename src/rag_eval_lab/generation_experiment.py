@@ -128,7 +128,11 @@ def run_generation(
     client = client or OllamaClient(timeout_s=cfg.generator.timeout_s)
     digest = client.model_digest(cfg.generator.model)
     generator = OllamaGenerator(
-        client, cfg.generator.model, cfg.generator.max_tokens, cfg.generator.temperature
+        client,
+        cfg.generator.model,
+        cfg.generator.max_tokens,
+        cfg.generator.temperature,
+        cfg.generator.num_ctx,
     )
     dataset = dataset or build_dataset(cfg)
 
@@ -158,6 +162,7 @@ def run_generation(
                     "digest": digest,
                     "max_tokens": cfg.generator.max_tokens,
                     "temperature": cfg.generator.temperature,
+                    "num_ctx": cfg.generator.num_ctx,
                 },
             }
             try:
@@ -213,14 +218,14 @@ def run_judging(
 
     client = client or OllamaClient(timeout_s=cfg.judge.timeout_s)
     digest = client.model_digest(cfg.judge.model)
-    judge = OllamaJudge(client, cfg.judge.model, cfg.judge.max_tokens)
+    judge = OllamaJudge(client, cfg.judge.model, cfg.judge.max_tokens, num_ctx=cfg.judge.num_ctx)
 
     records: list[dict] = []
     answers = [a for a in load_answers(out_dir) if a["answer_id"] not in done]
     for n, answer in enumerate(answers, start=1):
         record = {
             "answer_id": answer["answer_id"],
-            "judge": {"model": cfg.judge.model, "digest": digest},
+            "judge": {"model": cfg.judge.model, "digest": digest, "num_ctx": cfg.judge.num_ctx},
             "prompt_version": JUDGE_PROMPT_VERSION,
         }
         try:

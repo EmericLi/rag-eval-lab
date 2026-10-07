@@ -57,7 +57,12 @@ class Judge(Protocol):
 
 class OllamaJudge:
     def __init__(
-        self, client: OllamaClient, model: str, max_tokens: int = 200, retries: int = 2
+        self,
+        client: OllamaClient,
+        model: str,
+        max_tokens: int = 200,
+        retries: int = 2,
+        num_ctx: int = 8192,
     ) -> None:
         if retries < 0:
             raise ValueError(f"Invalid judge: retries={retries}")
@@ -65,6 +70,7 @@ class OllamaJudge:
         self.model = model
         self.max_tokens = max_tokens
         self.retries = retries
+        self.num_ctx = num_ctx
 
     def _ask(
         self, prompt: str, keys: tuple[str, ...], bool_keys: tuple[str, ...] = ()
@@ -73,7 +79,12 @@ class OllamaJudge:
         latency = 0.0
         for _ in range(self.retries + 1):
             completion = self.client.generate(
-                self.model, prompt, temperature=0.0, max_tokens=self.max_tokens, json_mode=True
+                self.model,
+                prompt,
+                temperature=0.0,
+                max_tokens=self.max_tokens,
+                json_mode=True,
+                num_ctx=self.num_ctx,
             )
             latency += completion.latency_ms
             try:

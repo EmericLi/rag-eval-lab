@@ -21,6 +21,7 @@ class GeneratorConfig(BaseModel):
     model: str
     temperature: float = 0.0
     max_tokens: int = Field(default=300, gt=0)
+    num_ctx: int = Field(default=8192, gt=0)
     timeout_s: float = Field(default=180.0, gt=0)
 
 
@@ -30,6 +31,7 @@ class JudgeConfig(BaseModel):
     model: str
     temperature: float = 0.0
     max_tokens: int = Field(default=200, gt=0)
+    num_ctx: int = Field(default=8192, gt=0)
     timeout_s: float = Field(default=300.0, gt=0)
 
 
@@ -104,6 +106,7 @@ class GenerationConfig(BaseModel):
             self.generator.model,
             str(self.generator.temperature),
             str(self.generator.max_tokens),
+            str(self.generator.num_ctx),
             ANSWER_PROMPT_VERSION,
         )[:12]
 

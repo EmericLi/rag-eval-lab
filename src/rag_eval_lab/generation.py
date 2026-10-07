@@ -22,14 +22,20 @@ class OllamaGenerator:
         model: str,
         max_tokens: int = 300,
         temperature: float = 0.0,
+        num_ctx: int = 8192,
     ) -> None:
         self.client = client
         self.model = model
         self.max_tokens = max_tokens
         self.temperature = temperature
+        self.num_ctx = num_ctx
 
     def answer(self, question: str, passages: list[Chunk]) -> Completion:
         prompt = render_answer_prompt(question, [p.text for p in passages])
         return self.client.generate(
-            self.model, prompt, temperature=self.temperature, max_tokens=self.max_tokens
+            self.model,
+            prompt,
+            temperature=self.temperature,
+            max_tokens=self.max_tokens,
+            num_ctx=self.num_ctx,
         )

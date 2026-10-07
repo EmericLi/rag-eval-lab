@@ -71,6 +71,7 @@ def test_run_generation_writes_one_record_per_context_and_query(mini_jsonl, tmp_
     assert len(lines) == 6
     record = json.loads(lines[0])
     assert record["generator"]["digest"] == "0123456789ab"
+    assert record["generator"]["num_ctx"] == 8192
     assert record["prompt_version"]
     assert record["answer"] == "réponse"
     assert record["reference"] == "Le volcan est un sujet important."
@@ -323,6 +324,7 @@ def test_run_judging_judges_every_answer(mini_jsonl, tmp_path):
             assert judgment["faithfulness"] is True
         assert judgment["correctness"] is False
         assert judgment["judge"]["digest"] == "0123456789ab"
+        assert judgment["judge"]["num_ctx"] == 8192
 
 
 def test_judgments_carry_the_judge_prompt_version_not_the_answers(mini_jsonl, tmp_path):

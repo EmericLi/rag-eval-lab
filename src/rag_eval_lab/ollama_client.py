@@ -88,6 +88,7 @@ class OllamaClient:
         max_tokens: int = 300,
         json_mode: bool = False,
         seed: int = 0,
+        num_ctx: int | None = None,
     ) -> Completion:
         payload: dict = {
             "model": model,
@@ -95,6 +96,8 @@ class OllamaClient:
             "stream": False,
             "options": {"temperature": temperature, "num_predict": max_tokens, "seed": seed},
         }
+        if num_ctx is not None:
+            payload["options"]["num_ctx"] = num_ctx
         if json_mode:
             payload["format"] = "json"
         start = time.perf_counter()

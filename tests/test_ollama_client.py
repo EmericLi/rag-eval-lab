@@ -45,6 +45,18 @@ def test_generate_builds_payload_and_parses_response():
     assert "format" not in payload
 
 
+def test_generate_sends_num_ctx_when_given():
+    transport = FakeTransport({"/api/generate": {"response": "ok"}})
+    OllamaClient(transport=transport).generate("m", "p", num_ctx=8192)
+    assert transport.calls[0][2]["options"]["num_ctx"] == 8192
+
+
+def test_generate_omits_num_ctx_by_default():
+    transport = FakeTransport({"/api/generate": {"response": "ok"}})
+    OllamaClient(transport=transport).generate("m", "p")
+    assert "num_ctx" not in transport.calls[0][2]["options"]
+
+
 def test_generate_json_mode_sets_format():
     transport = FakeTransport({"/api/generate": {"response": "{}"}})
     OllamaClient(transport=transport).generate("m", "p", json_mode=True)

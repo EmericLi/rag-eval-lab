@@ -27,6 +27,8 @@ def test_defaults_and_accessors():
     cfg = _config()
     assert cfg.n_passages == 5
     assert cfg.generator.max_tokens == 300
+    assert cfg.generator.num_ctx == 8192
+    assert cfg.judge.num_ctx == 8192
     assert cfg.judge.timeout_s == 300.0
     assert cfg.oracle_chunker == "fixed_1000_200"
     assert [c.name for c in cfg.contexts] == ["none", "bm25", "oracle"]
@@ -64,6 +66,19 @@ def test_answer_id_changes_with_n_passages_and_generator_settings():
     generator = BASE["generator"]
     assert _config(generator={**generator, "temperature": 0.7}).answer_id("bm25", "q1") != base
     assert _config(generator={**generator, "max_tokens": 100}).answer_id("bm25", "q1") != base
+
+
+def test_answer_id_changes_with_the_context_window():
+    base = _config().answer_id("bm25", "q1")
+    generator = BASE["generator"]
+    assert _config(generator={**generator, "num_ctx": 8192}).answer_id("bm25", "q1") == base
+    assert _config(generator={**generator, "num_ctx": 4096}).answer_id("bm25", "q1") != base
+    assert len(base) == 12
+
+
+def test_the_judge_window_does_not_change_answer_ids():
+    base = _config().answer_id("bm25", "q1")
+    assert _config(judge={**BASE["judge"], "num_ctx": 4096}).answer_id("bm25", "q1") == base
 
 
 def test_answer_id_rejects_an_unknown_context():
