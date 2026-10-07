@@ -1,0 +1,12 @@
+# Small run used to validate the setup and measure real speed on this CPU.
+dataset: { name: alloprof, n_queries: 4, seed: 42 }
+n_passages: 5
+oracle_chunker: fixed_1000_200
+generator: { model: "llama3.2:latest", temperature: 0, max_tokens: 300, timeout_s: 300 }
+judge:     { model: "llama3.1:8B",     temperature: 0, max_tokens: 200, timeout_s: 600 }
+# Dense contexts (e5-small, bge-m3) are exercised by the full run (v2.yaml), not here.
+contexts:
+  - { name: none,     kind: empty }
+  - { name: bm25,     kind: retrieved, chunker: none, retriever: bm25 }
+  - { name: oracle,   kind: oracle }
+annotation: { n: 60, seed: 7 }
