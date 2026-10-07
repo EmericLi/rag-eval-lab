@@ -1,15 +1,20 @@
 # Full v2a grid: 5 contexts x 1 generator, judged by a local model.
 #
-# n_queries sized from configs/v2-smoke.yaml measured on this machine
-# (Ryzen 7 8845HS, CPU only): generation p50 9 s (no passage) to 51 s (5 passages),
-# judging p50 28 s (one call, no passage) to 130 s (two calls). That is ~190 s of
-# generation and ~520 s of judging per query across the five contexts, so 40 queries
-# x 5 contexts = 200 answers ~= 8 h, plus a one-off ~2.5 h to index the dense contexts.
-dataset: { name: alloprof, n_queries: 40, seed: 42 }
+# num_ctx is set explicitly: Ollama defaults to 2048 tokens and silently truncated the
+# whole-document contexts (bm25 ~6100 tokens, e5-small ~3600) in the first run, which
+# measured a client default instead of retrieval quality. At 8192, 10 of 200 prompts
+# still exceed the window; that is recorded as a limitation.
+#
+# n_queries sized on this machine (Ryzen 7 8845HS, CPU only). With the 2048-token
+# default, a query cost ~190 s of generation and ~520 s of judging across the five
+# contexts; processing the previously truncated prompts in full roughly doubles that
+# for the two whole-document contexts, so 30 queries x 5 contexts = 150 answers ~= 8 h.
+# Dense indexing is already cached from the first run.
+dataset: { name: alloprof, n_queries: 30, seed: 42 }
 n_passages: 5
 oracle_chunker: fixed_1000_200
-generator: { model: "llama3.2:latest", temperature: 0, max_tokens: 300, timeout_s: 300 }
-judge:     { model: "llama3.1:8B",     temperature: 0, max_tokens: 200, timeout_s: 600 }
+generator: { model: "llama3.2:latest", temperature: 0, max_tokens: 300, timeout_s: 600, num_ctx: 8192 }
+judge:     { model: "llama3.1:8B",     temperature: 0, max_tokens: 200, timeout_s: 900, num_ctx: 8192 }
 contexts:
   - { name: none,     kind: empty }
   - { name: bm25,     kind: retrieved, chunker: none,           retriever: bm25 }
