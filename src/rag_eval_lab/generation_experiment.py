@@ -175,6 +175,7 @@ def run_generation(
                     n_passage_chars=sum(len(p.text) for p in passages),
                     latency_ms=completion.latency_ms,
                     eval_count=completion.eval_count,
+                    prompt_eval_count=completion.prompt_eval_count,
                 )
             except Exception as exc:  # noqa: BLE001 - one bad item must not stop an unattended run
                 if isinstance(exc, OllamaError):
@@ -242,6 +243,7 @@ def run_judging(
                 correctness=verdict.correctness,
                 rationales=verdict.rationales,
                 latency_ms=verdict.latency_ms,
+                prompt_eval_count=verdict.prompt_eval_count,
             )
         except Exception as exc:  # noqa: BLE001 - one bad item must not stop an unattended run
             if isinstance(exc, JudgeParseError):

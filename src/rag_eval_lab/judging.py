@@ -24,6 +24,7 @@ class Verdict:
     correctness: bool | None
     rationales: dict[str, str]
     latency_ms: float
+    prompt_eval_count: int = 0
 
 
 def extract_json(text: str) -> dict:
@@ -74,9 +75,10 @@ class OllamaJudge:
 
     def _ask(
         self, prompt: str, keys: tuple[str, ...], bool_keys: tuple[str, ...] = ()
-    ) -> tuple[dict, float]:
+    ) -> tuple[dict, float, int]:
         last: JudgeParseError | None = None
         latency = 0.0
+        prompt_tokens = 0
         for _ in range(self.retries + 1):
             completion = self.client.generate(
                 self.model,
@@ -87,12 +89,13 @@ class OllamaJudge:
                 num_ctx=self.num_ctx,
             )
             latency += completion.latency_ms
+            prompt_tokens += completion.prompt_eval_count
             try:
                 payload = extract_json(completion.text)
                 result = {key: payload[key] for key in keys}
                 for key in bool_keys:
                     result[key] = _as_bool(result[key], key, completion.text)
-                return (result, latency)
+                return (result, latency, prompt_tokens)
             except (JudgeParseError, KeyError) as exc:
                 last = (
                     exc
@@ -107,22 +110,25 @@ class OllamaJudge:
         correctness: bool | None = None
         rationales: dict[str, str] = {}
         latency = 0.0
+        prompt_tokens = 0
 
         if passages:
             prompt = render_grounding_prompt(question, [p.text for p in passages], answer)
-            payload, took = self._ask(
+            payload, took, used = self._ask(
                 prompt, ("faithful", "relevant", "reason"), bool_keys=("faithful", "relevant")
             )
             latency += took
+            prompt_tokens += used
             faithfulness = payload["faithful"]
             relevance = payload["relevant"]
             rationales["faithfulness"] = str(payload["reason"])
 
         if reference.strip():
             prompt = render_correctness_prompt(question, answer, reference)
-            payload, took = self._ask(prompt, ("correct", "reason"), bool_keys=("correct",))
+            payload, took, used = self._ask(prompt, ("correct", "reason"), bool_keys=("correct",))
             latency += took
+            prompt_tokens += used
             correctness = payload["correct"]
             rationales["correctness"] = str(payload["reason"])
 
-        return Verdict(faithfulness, relevance, correctness, rationales, latency)
+        return Verdict(faithfulness, relevance, correctness, rationales, latency, prompt_tokens)

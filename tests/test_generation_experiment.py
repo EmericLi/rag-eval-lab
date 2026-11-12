@@ -74,6 +74,7 @@ def test_run_generation_writes_one_record_per_context_and_query(mini_jsonl, tmp_
     assert record["generator"]["num_ctx"] == 8192
     assert record["prompt_version"]
     assert record["answer"] == "réponse"
+    assert record["eval_count"] == 5 and record["prompt_eval_count"] == 50
     assert record["reference"] == "Le volcan est un sujet important."
 
 
@@ -300,8 +301,11 @@ class JudgeTransport:
         if any(marker in prompt for marker in self.bad_json_for):
             return {"response": "je ne sais pas"}
         if "faithful" in prompt:
-            return {"response": '{"faithful": true, "relevant": true, "reason": "ok"}'}
-        return {"response": '{"correct": false, "reason": "non"}'}
+            return {
+                "response": '{"faithful": true, "relevant": true, "reason": "ok"}',
+                "prompt_eval_count": 30,
+            }
+        return {"response": '{"correct": false, "reason": "non"}', "prompt_eval_count": 30}
 
 
 def test_run_judging_judges_every_answer(mini_jsonl, tmp_path):
@@ -325,6 +329,9 @@ def test_run_judging_judges_every_answer(mini_jsonl, tmp_path):
         assert judgment["correctness"] is False
         assert judgment["judge"]["digest"] == "0123456789ab"
         assert judgment["judge"]["num_ctx"] == 8192
+        # 30 per call: two calls with passages, one (correctness only) in the "none" context
+        calls = 1 if answers[answer_id]["context"] == "none" else 2
+        assert judgment["prompt_eval_count"] == 30 * calls
 
 
 def test_judgments_carry_the_judge_prompt_version_not_the_answers(mini_jsonl, tmp_path):

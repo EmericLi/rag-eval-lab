@@ -16,7 +16,7 @@ class ScriptedTransport:
     def __call__(self, method, path, payload):
         self.prompts.append(payload["prompt"])
         self.options.append(payload["options"])
-        return {"response": self.responses.pop(0)}
+        return {"response": self.responses.pop(0), "prompt_eval_count": 7}
 
 
 def _judge(transport, **kwargs):
@@ -46,6 +46,7 @@ def test_verdict_combines_both_calls():
     assert verdict.rationales["correctness"] == "contredit la référence"
     assert verdict.latency_ms > 0
     assert len(transport.prompts) == 2
+    assert verdict.prompt_eval_count == 14
 
 
 def test_every_judge_call_sends_the_configured_context_window():
