@@ -34,16 +34,20 @@ finding, not as results.
 
 The same 150 answers, scored by the judge and by a human, give opposite rankings.
 
-| Context | Correctness — human | Correctness — judge | Faithfulness — human |
-|---|---|---|---|
-| **oracle** | **0.58** [0.32, 0.81] | 0.67 | **0.83** [0.55, 0.95] |
-| bm25 | 0.30 [0.11, 0.60] | 0.83 | 0.42 [0.19, 0.68] |
-| e5-small | 0.20 [0.06, 0.51] | 0.67 | 0.50 [0.25, 0.75] |
-| none | 0.11 [0.02, 0.44] | 0.75 | n/a |
-| bge-m3 | 0.10 [0.02, 0.40] | 0.42 | 0.58 [0.32, 0.81] |
+The human column is the annotated subset (9–12 labels per context, `?` answers excluded); the
+judge column is its verdict over all 30 answers of that context, as published in
+`results/v2/report-generation.md`.
 
-Read by the judge, the benchmark says *retrieval is useless*: the closed-book context (0.75)
-beats every retrieval setup, and perfect retrieval (0.67) beats none of them convincingly.
+| Context | Correctness — human (n) | Correctness — judge (n=30) | Faithfulness — human (n) |
+|---|---|---|---|
+| **oracle** | **0.58** [0.32, 0.81] (12) | 0.700 | **0.83** [0.55, 0.95] (12) |
+| bm25 | 0.30 [0.11, 0.60] (10) | 0.633 | 0.42 [0.19, 0.68] (12) |
+| e5-small | 0.20 [0.06, 0.51] (10) | 0.733 | 0.50 [0.25, 0.75] (12) |
+| none | 0.11 [0.02, 0.44] (9) | 0.833 | n/a |
+| bge-m3 | 0.10 [0.02, 0.40] (10) | 0.567 | 0.58 [0.32, 0.81] (12) |
+
+Read by the judge, the benchmark says *retrieval is useless*: the closed-book context scores
+highest (0.833) and perfect retrieval (0.700) beats none of the retrievers convincingly.
 That is the report a project without human calibration would have published.
 
 Read by a human, the benchmark says the opposite: closed-book is the **worst** setting (0.11),
@@ -54,6 +58,16 @@ Significance, Fisher's exact test on the human labels:
 - oracle vs `bge-m3` correctness (7/12 vs 1/10): **p = 0.031**
 - oracle vs closed-book correctness (7/12 vs 1/9): p = 0.067
 - oracle vs `bm25` faithfulness (10/12 vs 5/12): p = 0.089
+
+These p-values are **unadjusted**, and the reported pair was chosen after seeing the data: the
+oracle–`bge-m3` gap is the largest of the ten available pairwise comparisons, so p = 0.031
+would not survive a Bonferroni correction (0.005 across ten pairs). The argument rests on the
+effect size of the oracle-vs-closed-book contrast (0.58 vs 0.11), not on that one test.
+
+The comparison is also **unpaired**: the annotation sample draws independently per context, so
+the 12 oracle answers and the 12 `bge-m3` answers share only half their queries, and question
+difficulty is confounded with context. Sampling the same queries across contexts would be the
+cheapest way to gain power at this sample size.
 
 So the "perfect retrieval beats the alternatives" direction is solid, and the fine ranking
 between the three real retrievers is not: with 9–12 labels per context, those differences are
@@ -66,9 +80,9 @@ retrieval quality:
 
 | Failure | Example | What happened |
 |---|---|---|
-| **Refusal despite relevant passages** | "Qui étaient Jean Talon, Frontenac et Mgr de Laval ?" | Passages [1] and [2] were the Jean Talon fact sheets; the answer states that "the extracts contain no information on Jean Talon" |
-| **Invention despite a correct formula** | "Comment calculer la température avant la réaction d'un mélange ?" | Passage [2] contains `Q = m·c·ΔT`; the answer produced `ΔH = ΔU + pΔV` and `ΔT = ΔH/(nCp)`, neither of which appears anywhere in the context |
-| **Contradicting a worked example** | "Convertir 0,15 g/L en % m/V" | Two passages solve the identical exercise by dividing by 10; the answer multiplied by 10 and returned 1.5% instead of 0.015% |
+| **Refusal despite relevant passages** (`e5-small`, answer `490896f38aa2`) | "Qui étaient Jean Talon, Frontenac et Mgr de Laval ?" | Passages [1] and [2] were the Jean Talon fact sheets; the answer states that "the extracts contain no information on Jean Talon" |
+| **Invention despite a correct formula** (`e5-small`, answer `bfc5763900b4`) | "Comment calculer la température avant la réaction d'un mélange ?" | Passage [2] contains `Q = m·c·ΔT`; the answer produced `ΔH = ΔU + pΔV` and `ΔT = ΔH/(nCp)`, neither of which appears anywhere in the context. The same question under `oracle` (`94241e012ac2`) carries the calorimetry sheet in three of five passages, and the model refuses outright |
+| **Contradicting a worked example** (`bge-m3`, answer `29aad9c3db05`) | "Convertir 0,15 g/L en % m/V" | Two passages solve the identical exercise by dividing by 10; the answer multiplied by 10 and returned 1.5% instead of 0.015% |
 
 This explains why better retrieval does not translate linearly into better answers here: with
 `oracle` passages the model still gets 42% of answers wrong. The bottleneck at this model size
@@ -80,13 +94,30 @@ is the generator's ability to exploit its context, not the retriever.
   test; no fine ranking between retrievers should be read from this table.
 - **One annotator, no second pass.** Inter-annotator agreement is unknown, so the "human"
   column is one person's judgement, not a gold standard.
+- **The annotator was not blind to the condition.** The session displayed the context name
+  (`oracle`, `bm25`, …) above each item, and the annotator is the author, who expected oracle
+  to win. The labels are blind to the *judge's* verdicts, which is what the calibration
+  requires, but not to the experimental condition, which Finding 2 rests on. The display has
+  since been changed; a future round will be blind on both counts.
+- **Contexts differ by chunking as well as by retriever.** `bm25` and `e5-small` index whole
+  documents (`chunker: none`, the v1 best for each), `bge-m3` and `oracle` use
+  `fixed_1000_200`. Their prompts therefore differ by a factor of five in size (median 23,048
+  and 13,508 passage characters against 4,846 and 4,113), so a row-to-row comparison is not a
+  clean retriever comparison.
 - **Reference answers are conversational.** Many Alloprof answers are "here is the fact sheet"
   with a link that the dataset does not carry, so correctness was unjudgeable for 9 of 60
   answers (recorded as null, excluded).
 - **One generator, one judge, one prompt per task.** A larger judge (or an API judge) might
   behave differently; that is the natural next experiment and the interface already allows it.
-- **`num_ctx` = 8192**: 10 of 200 prompts in the first run still exceeded it. See the incident
-  below.
+- **The published run still truncates the two whole-document contexts.** With `num_ctx` set to
+  8192, an estimated 10 of 30 `bm25` prompts and 3 of 30 `e5-small` prompts still exceed the
+  window (median ≈ 6,980 and ≈ 4,090 tokens, largest ≈ 21,800, estimated at 3.3 characters per
+  token); `none`, `oracle` and `bge-m3` stay below 1,600 tokens and are unaffected. The two
+  truncated rows are therefore measured on a prompt the model saw only in part, which can only
+  understate them. The headline results — the judge inversion, and the oracle-vs-closed-book
+  and oracle-vs-`bge-m3` contrasts — involve no truncated context. The run was not repeated:
+  a correct measurement needs the token counts, which the harness now records
+  (`prompt_eval_count`), rather than this character-based estimate.
 - **Latency was measured on a laptop CPU** and includes one run interrupted by system sleep.
 
 ## Incident: a client default that silently changed the measurement
@@ -100,6 +131,49 @@ retrieval quality.
 The fix sets `num_ctx` explicitly for the generator **and** the judge, records it in every
 result record, and includes it in the resume key so a window change can never reuse answers
 produced under another window.
+
+## Related work
+
+Two papers bear directly on these findings; both were read before being cited here.
+
+**[Pandey, *Can Small Language Models Use What They Retrieve?*](https://arxiv.org/abs/2603.11513)
+(arXiv 2603.11513, March 2026 — single-author preprint, not peer-reviewed)** runs the same
+grid shape on Qwen2.5 1.5B/3B/7B over NQ Open and HotpotQA, scored by exact match, with
+no-context / BM25 / dense / oracle conditions. It corroborates Finding 3 closely: with oracle
+retrieval, models of 7B or less "fail to extract the correct answer 85 to 100 percent of the
+time on questions they cannot answer alone", and the dominant failure is irrelevant
+generation — the model ignoring the context entirely, which is this benchmark's Jean Talon
+case.
+
+Its headline — that RAG is a net negative below 7B — looks at first like a contradiction of
+Finding 2, and is not. The paper separates questions the model already answers closed-book
+from those it does not. For Qwen2.5-3B, exact match on **unknown** questions goes from 0.0%
+with no context to 12.8% with oracle (retrieval helps, this benchmark's direction), while on
+**known** questions it falls from 100% to 54.4% (context destroys parametric answers). The net
+negative comes entirely from the second group. Here the closed-book correctness is 0.11, so
+that second group is almost empty on this corpus and only the gain remains. The two results
+describe different regimes rather than disagreeing.
+
+**[Thakur et al., *Judging the Judges*](https://arxiv.org/abs/2406.12624) (GEM² workshop at
+ACL 2025, UMass Amherst and Meta)** evaluates thirteen judges on TriviaQA answer correctness
+against human majority votes. It supports the mechanism behind Finding 1: judges "tend to
+judge positively when in doubt", an effect the paper reports as "more pronounced for small
+models than for larger ones", and they "struggle with under-specified answers and tend to be
+lenient".
+
+It does not support the magnitude found here, and the difference is informative. Their
+Llama-3 8B reaches a Scott's π of 0.59–0.78 against a human-human π of 96.2, far above the
+κ = −0.308 measured here. Their task is deliberately easy — answer correctness against a
+reference string — while faithfulness requires checking every claim against five passages.
+Their paper evaluates no RAG setting and no groundedness criterion at all. A note on metrics:
+they deliberately dropped Cohen's κ for Scott's π, judging it more discriminative; this
+report uses κ, which is the more common choice but not the only defensible one.
+
+**The gap this fills.** Neither paper, nor anything else found in a search, publishes
+judge-human agreement for *faithfulness in a RAG setting, broken down by judge size*. The
+κ = −0.308 for `llama3.1:8B` on 48 labelled pairs is a small, single-annotator data point in
+that gap — enough to justify not trusting a free local judge on this criterion, not enough to
+generalise.
 
 ## What v2b should test
 

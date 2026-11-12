@@ -54,10 +54,10 @@ contexts (no passage, three real retrievers, and the labelled documents as an up
 scores all 150 answers with a local judge (`llama3.1:8B`), and then **calibrates that judge
 against 60 answers labelled by hand**, blind to its verdicts.
 
-| | Judge | Human (60 labels) |
+| | Judge (150 answers) | Human (60 labels) |
 |---|---|---|
-| Best context by correctness | `none` — no passage at all (0.75) | **`oracle` — perfect retrieval (0.58)** |
-| Worst context by correctness | `bge-m3` (0.42) | `none` — no passage at all (0.11) |
+| Best context by correctness | `none` — no passage at all (0.83) | **`oracle` — perfect retrieval (0.58)** |
+| Worst context by correctness | `bge-m3` (0.57) | `none` — no passage at all (0.11) |
 
 **The judge inverts the conclusion.** Read through `llama3.1:8B`, this benchmark says
 retrieval is useless and a closed-book model answers best. Read through human labels, the
@@ -70,8 +70,8 @@ Three findings:
    unfaithful, it recognised 2. It is systematically indulgent (says "correct" 61% of the
    time against a human's 27%).
 2. **Retrieval does help — when it is right**: oracle vs `bge-m3` correctness, 7/12 vs 1/10,
-   Fisher p = 0.031. The ranking *between* the three real retrievers is not significant at
-   9–12 labels per context, and is not claimed.
+   Fisher p = 0.031 (unadjusted, pair chosen post hoc). The ranking *between* the three real
+   retrievers is not significant at 9–12 labels per context, and is not claimed.
 3. **A 3B generator fails to use passages it was handed**: it refuses while the answer sits in
    passage [1], invents formulas while the right one is in context, and contradicts a worked
    example by a factor of 100. At this model size the bottleneck is the generator, not the
