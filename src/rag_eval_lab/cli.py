@@ -1,4 +1,5 @@
-"""Command-line interface: `rel run` and `rel report`."""
+"""Command-line interface: `rel run`, `rel report`, `rel generate`, `rel judge`,
+`rel annotate` and `rel report-gen`."""
 
 from __future__ import annotations
 
