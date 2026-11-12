@@ -40,3 +40,4 @@ desktop.ini
 
 # v2 validation run output (not committed)
 results/v2-smoke/
+results/v2-ctx2048/

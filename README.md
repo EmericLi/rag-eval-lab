@@ -47,6 +47,42 @@ AMD Ryzen 7 8845HS, CPU only.
 
 Full analysis, failure cases and limitations: [docs/results-v1.md](docs/results-v1.md).
 
+## Generation (v2a) — is the LLM judge even right?
+
+v2a extends the benchmark past retrieval: it generates an answer per query under five
+contexts (no passage, three real retrievers, and the labelled documents as an upper bound),
+scores all 150 answers with a local judge (`llama3.1:8B`), and then **calibrates that judge
+against 60 answers labelled by hand**, blind to its verdicts.
+
+| | Judge | Human (60 labels) |
+|---|---|---|
+| Best context by correctness | `none` — no passage at all (0.75) | **`oracle` — perfect retrieval (0.58)** |
+| Worst context by correctness | `bge-m3` (0.42) | `none` — no passage at all (0.11) |
+
+**The judge inverts the conclusion.** Read through `llama3.1:8B`, this benchmark says
+retrieval is useless and a closed-book model answers best. Read through human labels, the
+closed-book setting is the *worst* and perfect retrieval is five times better.
+
+Three findings:
+
+1. **A free local judge cannot be trusted here, and the number says so**: agreement 0.40 with
+   a Cohen's κ of **−0.308** on faithfulness — worse than chance. Of 20 answers a human called
+   unfaithful, it recognised 2. It is systematically indulgent (says "correct" 61% of the
+   time against a human's 27%).
+2. **Retrieval does help — when it is right**: oracle vs `bge-m3` correctness, 7/12 vs 1/10,
+   Fisher p = 0.031. The ranking *between* the three real retrievers is not significant at
+   9–12 labels per context, and is not claimed.
+3. **A 3B generator fails to use passages it was handed**: it refuses while the answer sits in
+   passage [1], invents formulas while the right one is in context, and contradicts a worked
+   example by a factor of 100. At this model size the bottleneck is the generator, not the
+   retriever.
+
+An incident worth reading: the first full run measured an Ollama client default (a 2048-token
+window silently truncating whole-document contexts) rather than retrieval quality. It was
+caught, fixed, and documented.
+
+Full analysis, failure cases and limitations: [docs/results-v2.md](docs/results-v2.md).
+
 ## Quickstart
 
 ```bash
@@ -120,10 +156,10 @@ offline.
 
 ## Roadmap
 
-- **v2** — answer generation: faithfulness and answer-relevance scored by an LLM judge
-  (local Ollama model vs a free-tier API), with the judge calibrated against human labels;
-  synthetic question generation for any corpus.
-- **v3** — a small demo app (Streamlit or FastAPI) on top of the best configuration.
+- **v2b** — a stronger judge (free-tier API) measured against the same 60 human labels; an 8B
+  generator on the oracle context; more labels on the two extreme contexts.
+- **v3** — synthetic question generation for any corpus, and a small demo app on top of the
+  best configuration.
 
 ## License
 
