@@ -59,13 +59,6 @@ class ContextConfig(BaseModel):
         return self
 
 
-class AnnotationConfig(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    n: int = Field(default=60, gt=0)
-    seed: int = 7
-
-
 class GenerationConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -75,7 +68,6 @@ class GenerationConfig(BaseModel):
     judge: JudgeConfig
     n_passages: int = Field(default=5, gt=0)
     oracle_chunker: str = "fixed_1000_200"
-    annotation: AnnotationConfig = Field(default_factory=AnnotationConfig)
     cache_dir: str = ".cache/embeddings"
 
     @model_validator(mode="after")

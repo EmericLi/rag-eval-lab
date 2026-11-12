@@ -15,7 +15,6 @@ BASE = {
         {"name": "bm25", "kind": "retrieved", "chunker": "none", "retriever": "bm25"},
         {"name": "oracle", "kind": "oracle"},
     ],
-    "annotation": {"n": 60, "seed": 7},
 }
 
 

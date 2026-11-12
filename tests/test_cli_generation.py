@@ -18,7 +18,6 @@ def _write_config(tmp_path, mini_jsonl):
             {"name": "none", "kind": "empty"},
             {"name": "bm25", "kind": "retrieved", "chunker": "fixed_200_50", "retriever": "bm25"},
         ],
-        "annotation": {"n": 2, "seed": 1},
     }
     path = tmp_path / "v2.yaml"
     path.write_text(yaml.safe_dump(config), encoding="utf-8")

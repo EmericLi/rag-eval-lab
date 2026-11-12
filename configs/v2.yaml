@@ -21,4 +21,3 @@ contexts:
   - { name: e5-small, kind: retrieved, chunker: none,           retriever: dense:e5-small }
   - { name: bge-m3,   kind: retrieved, chunker: fixed_1000_200, retriever: dense:bge-m3 }
   - { name: oracle,   kind: oracle }
-annotation: { n: 60, seed: 7 }
