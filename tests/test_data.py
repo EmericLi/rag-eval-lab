@@ -99,3 +99,11 @@ def test_load_jsonl_reads_an_optional_answer(tmp_path):
 def test_mini_jsonl_round_trips_the_reference_answer(mini_jsonl):
     dataset = load_jsonl(mini_jsonl)
     assert dataset.queries[0].answer == "Le volcan est un sujet important."
+
+
+def test_load_jsonl_turns_a_null_answer_into_an_empty_string(tmp_path):
+    (tmp_path / "corpus.jsonl").write_text('{"id": "d0", "text": "t"}\n', encoding="utf-8")
+    (tmp_path / "queries.jsonl").write_text(
+        '{"id": "q0", "text": "q", "answer": null, "relevant": ["d0"]}\n', encoding="utf-8"
+    )
+    assert load_jsonl(tmp_path).queries[0].answer == ""
