@@ -141,7 +141,7 @@ def _human_by_context(answers: list[dict], annotations: list[dict]) -> list[str]
     if not labels:
         return lines + ["Not calibrated yet: no human annotations to break down by context."]
     lines += [
-        "| Context | n | human correctness (95% CI) | human faithfulness (95% CI) |",
+        "| Context | annotated | human correctness (95% CI) | human faithfulness (95% CI) |",
         "|---|---|---|---|",
     ]
     for context in sorted(labels):
@@ -232,6 +232,8 @@ def build_generation_report(out_dir: Path) -> Path:
         "  grounding is undefined. Those cells read `n/a`.",
         "- Agreement counts only answers that carry both a human label and a judge verdict;",
         "  `?` answers during annotation are stored as null and excluded.",
+        "- `annotated` counts the labelled answers of a context; a rate excludes the `?` ones,",
+        "  so its own denominator can be smaller than that count.",
         "- Confusion is reported judge-versus-human: `fp` means the judge said true where the",
         "  human said false (an indulgent judge), `fn` the opposite (a severe one).",
         "- Kappa reads `undefined` when the judge or the human gave the same label to every",
