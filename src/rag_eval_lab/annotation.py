@@ -83,7 +83,7 @@ def _passage_view(text: str, full: bool) -> str:
 def _show_item(
     write: Callable[[str], None], answer: dict, index: int, total: int, full: bool
 ) -> None:
-    write(f"\n--- {index}/{total} (contexte : {answer['context']})")
+    write(f"\n--- {index}/{total}")
     write(f"Question : {answer['question']}")
     for position, passage in enumerate(answer["passages"], start=1):
         write(f"[{position}] {_passage_view(passage['text'], full)}")

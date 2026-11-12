@@ -190,6 +190,13 @@ def test_full_display_applies_to_the_current_item_only(tmp_path):
     assert "FIN-DU-TEXTE" not in second_item
 
 
+def test_context_name_is_not_shown_to_the_annotator(tmp_path):
+    _write_answers(tmp_path, _answers(n_per_context=1, contexts=("bm25",)))
+    output = _run(tmp_path, ["o", "o"])
+    assert "bm25" not in output and "contexte" not in output
+    assert "--- 1/1" in output
+
+
 def test_short_passage_is_shown_without_marker(tmp_path):
     _write_answers(tmp_path, _answers(n_per_context=1, contexts=("bm25",)))
     output = _run(tmp_path, ["o", "o"])
