@@ -1,6 +1,12 @@
 import pytest
 
-from rag_eval_lab.calibration import agreement, cohen_kappa, confusion, wilson_interval
+from rag_eval_lab.calibration import (
+    agreement,
+    cohen_kappa,
+    confusion,
+    fisher_exact,
+    wilson_interval,
+)
 
 
 def test_wilson_interval_brackets_the_rate():
@@ -62,3 +68,9 @@ def test_agreement_without_overlap_returns_zero_sized_entries():
     result = agreement([], [])
     assert result["faithfulness"]["n"] == 0
     assert result["correctness"]["kappa"] == 0.0
+
+
+def test_fisher_exact_known_values():
+    assert fisher_exact(7, 5, 1, 9) == pytest.approx(0.031, abs=5e-4)
+    assert fisher_exact(7, 5, 1, 8) == pytest.approx(0.067, abs=5e-4)
+    assert fisher_exact(5, 5, 5, 5) == pytest.approx(1.0)

@@ -253,3 +253,30 @@ def test_load_judgments_skips_lines_without_answer_id(tmp_path):
     # Should return only the judgments with answer_id
     assert len(judgments) == 2
     assert {j["answer_id"] for j in judgments} == {"a", "b"}
+
+
+def test_report_lists_human_rates_by_context_with_the_fisher_line(tmp_path):
+    answers = [_answer(f"o{i}", "oracle") for i in range(4)] + [
+        _answer(f"n{i}", "none") for i in range(4)
+    ]
+    _write(tmp_path, "answers.jsonl", answers)
+    _write(tmp_path, "judgments.jsonl", [_judgment(a["answer_id"], True, True) for a in answers])
+    labels = [{"answer_id": f"o{i}", "faithfulness": True, "correctness": True} for i in range(4)]
+    labels += [
+        {"answer_id": f"n{i}", "faithfulness": None, "correctness": i == 0} for i in range(4)
+    ]
+    _write(tmp_path, "annotations.jsonl", labels)
+    text = build_generation_report(tmp_path).read_text(encoding="utf-8")
+    section = text.split("## Human labels by context")[1].split("## Notes")[0]
+    assert "| oracle | 4 | 1.000 [0.510, 1.000] | 1.000 [0.510, 1.000] |" in section
+    assert "| none | 4 | 0.250 [0.046, 0.699] | n/a |" in section
+    assert "`oracle` (highest) vs `none` (lowest): p = 0.143" in section
+    assert "selected after seeing the data" in section
+
+
+def test_report_without_annotations_has_no_human_table(tmp_path):
+    _write(tmp_path, "answers.jsonl", [_answer("a1", "bm25")])
+    _write(tmp_path, "judgments.jsonl", [_judgment("a1", True, True)])
+    text = build_generation_report(tmp_path).read_text(encoding="utf-8")
+    section = text.split("## Human labels by context")[1].split("## Notes")[0]
+    assert "Not calibrated yet" in section and "|" not in section

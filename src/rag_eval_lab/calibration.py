@@ -78,3 +78,16 @@ def agreement(
             ),
         }
     return result
+
+
+def fisher_exact(a: int, b: int, c: int, d: int) -> float:
+    """Two-sided Fisher exact p-value of the 2x2 table [[a, b], [c, d]] (stdlib only)."""
+    row1, col1, n = a + b, a + c, a + b + c + d
+
+    def prob(x: int) -> float:
+        return math.comb(row1, x) * math.comb(n - row1, col1 - x) / math.comb(n, col1)
+
+    observed = prob(a)
+    low, high = max(0, col1 - (n - row1)), min(row1, col1)
+    # the 1e-7 slack keeps equally likely tables in the sum despite float rounding
+    return min(1.0, sum(p for x in range(low, high + 1) if (p := prob(x)) <= observed * (1 + 1e-7)))

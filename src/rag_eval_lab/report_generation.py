@@ -13,7 +13,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
 from rag_eval_lab.annotation import load_annotations  # noqa: E402
-from rag_eval_lab.calibration import agreement  # noqa: E402
+from rag_eval_lab.calibration import agreement, fisher_exact, wilson_interval  # noqa: E402
 from rag_eval_lab.generation_experiment import load_answers  # noqa: E402
 
 logger = logging.getLogger(__name__)
@@ -116,6 +116,55 @@ def _format_kappa(stats: dict) -> str:
     return f"{stats['kappa']:.3f}"
 
 
+def _human_rate_cell(values: list[bool]) -> str:
+    if not values:
+        return "n/a"
+    low, high = wilson_interval(sum(values), len(values))
+    return f"{sum(values) / len(values):.3f} [{low:.3f}, {high:.3f}]"
+
+
+def _human_by_context(answers: list[dict], annotations: list[dict]) -> list[str]:
+    """Markdown lines for the per-context human rates and the headline Fisher test."""
+    context_of = {a["answer_id"]: a["context"] for a in answers}
+    labels: dict[str, dict[str, list[bool]]] = {}
+    counts: dict[str, int] = {}
+    for annotation in annotations:
+        context = context_of.get(annotation["answer_id"])
+        if context is None:
+            continue
+        counts[context] = counts.get(context, 0) + 1
+        bucket = labels.setdefault(context, {"faithfulness": [], "correctness": []})
+        for criterion in bucket:
+            if isinstance(annotation.get(criterion), bool):
+                bucket[criterion].append(annotation[criterion])
+    lines = ["", "## Human labels by context", ""]
+    if not labels:
+        return lines + ["Not calibrated yet: no human annotations to break down by context."]
+    lines += [
+        "| Context | n | human correctness (95% CI) | human faithfulness (95% CI) |",
+        "|---|---|---|---|",
+    ]
+    for context in sorted(labels):
+        corr, faith = labels[context]["correctness"], labels[context]["faithfulness"]
+        lines.append(
+            f"| {context} | {counts[context]} | {_human_rate_cell(corr)} | "
+            f"{_human_rate_cell(faith)} |"
+        )
+    rated = {c: v["correctness"] for c, v in labels.items() if v["correctness"]}
+    if len(rated) >= 2:
+        best = max(rated, key=lambda c: sum(rated[c]) / len(rated[c]))
+        worst = min(rated, key=lambda c: sum(rated[c]) / len(rated[c]))
+        top, bottom = rated[best], rated[worst]
+        p = fisher_exact(sum(top), len(top) - sum(top), sum(bottom), len(bottom) - sum(bottom))
+        lines += [
+            "",
+            f"Fisher exact test, human correctness, `{best}` (highest) vs `{worst}` (lowest): "
+            f"p = {p:.3f}, two-sided. Unadjusted for multiple comparisons, and the pair was "
+            "selected after seeing the data, so read it as descriptive.",
+        ]
+    return lines
+
+
 def build_generation_report(out_dir: Path) -> Path:
     out_dir = Path(out_dir)
     judgments = load_judgments(out_dir)
@@ -174,6 +223,7 @@ def build_generation_report(out_dir: Path) -> Path:
             "The judge has not been calibrated yet: no human annotations. "
             "Run `rel annotate` to label answers, then regenerate this report.",
         ]
+    lines += _human_by_context(answers, annotations)
     lines += [
         "",
         "## Notes",
