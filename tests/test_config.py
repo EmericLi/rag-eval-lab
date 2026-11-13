@@ -97,3 +97,12 @@ def test_build_reranker():
     assert reranker.model_id == "cross-encoder/mmarco-mMiniLMv2-L12-H384-v1"
     with pytest.raises(ValueError, match="Unknown reranker"):
         build_reranker("nope")
+
+
+def test_build_retriever_knows_the_tuned_french_bm25():
+    tuned = build_retriever("bm25-fr")
+    assert isinstance(tuned, BM25Retriever)
+    assert tuned.analyzer("les divisions") == ["division"]
+    hybrid = build_retriever("hybrid:bm25-fr+hashing")
+    assert isinstance(hybrid.retrievers[0], BM25Retriever)
+    assert hybrid.retrievers[0].analyzer("les divisions") == ["division"]

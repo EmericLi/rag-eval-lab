@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from rag_eval_lab.cache import EmbeddingCache
 from rag_eval_lab.encoders import Encoder, HashingEncoder, SentenceTransformerEncoder
 from rag_eval_lab.reranking import CrossEncoderReranker, Reranker
 from rag_eval_lab.retrieval import BM25Retriever, DenseRetriever, HybridRetriever, Retriever
+from rag_eval_lab.text import analyze_fr, tokenize
 
 ENCODERS: dict[str, dict[str, str]] = {
     "e5-small": {
@@ -20,6 +23,10 @@ ENCODERS: dict[str, dict[str, str]] = {
     },
     "bge-m3": {"model_id": "BAAI/bge-m3"},
 }
+
+# `bm25` keeps the raw lowercase tokenizer of the first v1 run, as a reference point;
+# `bm25-fr` is the tuned baseline.
+LEXICAL: dict[str, Callable[[str], list[str]]] = {"bm25": tokenize, "bm25-fr": analyze_fr}
 
 RERANKERS: dict[str, str] = {
     "minilm": "cross-encoder/mmarco-mMiniLMv2-L12-H384-v1",
@@ -38,8 +45,8 @@ def build_encoder(name: str) -> Encoder:
 
 def build_retriever(spec: str, cache: EmbeddingCache | None = None) -> Retriever:
     kind, _, arg = spec.partition(":")
-    if spec == "bm25":
-        return BM25Retriever()
+    if spec in LEXICAL:
+        return BM25Retriever(LEXICAL[spec])
     if kind == "dense" and arg:
         return DenseRetriever(build_encoder(arg), cache=cache)
     if kind == "hybrid" and arg:
@@ -47,10 +54,11 @@ def build_retriever(spec: str, cache: EmbeddingCache | None = None) -> Retriever
         if len(parts) < 2:
             raise ValueError(f"Hybrid retriever '{spec}' needs at least two parts")
         return HybridRetriever(
-            [build_retriever(p if p == "bm25" else f"dense:{p}", cache) for p in parts]
+            [build_retriever(p if p in LEXICAL else f"dense:{p}", cache) for p in parts]
         )
     raise ValueError(
-        f"Unknown retriever spec '{spec}'. Expected 'bm25', 'dense:<encoder>' or 'hybrid:<a>+<b>'."
+        f"Unknown retriever spec '{spec}'. Expected 'bm25', 'bm25-fr', 'dense:<encoder>' "
+        "or 'hybrid:<a>+<b>'."
     )
 
 

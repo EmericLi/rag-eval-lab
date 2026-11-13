@@ -2,11 +2,16 @@ import numpy as np
 
 from rag_eval_lab.cache import EmbeddingCache, make_key
 from rag_eval_lab.encoders import HashingEncoder, SentenceTransformerEncoder
-from rag_eval_lab.text import tokenize
+from rag_eval_lab.text import analyze_fr, tokenize
 
 
 def test_tokenize_lowercases_and_keeps_accents():
     assert tokenize("Le Volcan, l'ÉTÉ!") == ["le", "volcan", "l", "été"]
+
+
+def test_analyze_fr_folds_accents_drops_function_words_and_plurals():
+    assert analyze_fr("Je ne comprends pas les Divisions de l'ÉTÉ") == ["comprend", "division"]
+    assert analyze_fr("gaz bus") == ["gaz", "bus"]  # words of three letters keep their s/x
 
 
 def test_make_key_is_deterministic_and_unambiguous():

@@ -4,6 +4,7 @@ import pytest
 from rag_eval_lab.cache import EmbeddingCache
 from rag_eval_lab.encoders import HashingEncoder
 from rag_eval_lab.retrieval import BM25Retriever, DenseRetriever, HybridRetriever
+from rag_eval_lab.text import analyze_fr
 from rag_eval_lab.types import Chunk, Hit
 
 CHUNKS = [
@@ -16,16 +17,31 @@ CHUNKS = [
 def test_bm25_ranks_matching_chunk_first():
     retriever = BM25Retriever()
     retriever.index(CHUNKS)
-    hits = retriever.search("volcan", k=2)
-    assert len(hits) == 2
-    assert hits[0].chunk.id == "a#0"
+    hits = retriever.search("volcan actif plantes", k=2)
+    assert [h.chunk.id for h in hits] == ["a#0", "b#0"]
     assert hits[0].score >= hits[1].score
 
 
-def test_search_k_larger_than_corpus():
+def test_bm25_returns_only_chunks_that_share_a_term_with_the_query():
     retriever = BM25Retriever()
     retriever.index(CHUNKS)
-    assert len(retriever.search("volcan", k=50)) == 3
+    hits = retriever.search("volcan", k=50)
+    assert [h.chunk.id for h in hits] == ["a#0"]
+    assert retriever.search("introuvable", k=50) == []
+
+
+def test_bm25_fr_matches_across_plural_and_accents():
+    chunks = [
+        Chunk("a#0", "a", "La division de nombres entiers"),
+        Chunk("b#0", "b", "Les types de phrases"),
+        Chunk("c#0", "c", "Le théâtre classique"),
+    ]
+    raw, tuned = BM25Retriever(), BM25Retriever(analyze_fr)
+    raw.index(chunks)
+    tuned.index(chunks)
+    assert raw.search("je ne comprends pas les divisions", k=3)[0].chunk.id != "a#0"
+    assert [h.chunk.id for h in tuned.search("je ne comprends pas les divisions", k=3)] == ["a#0"]
+    assert tuned.search("theatre", k=3)[0].chunk.id == "c#0"
 
 
 def test_dense_retriever_ranks_and_caches(tmp_path):

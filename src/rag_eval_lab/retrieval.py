@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Protocol
 
 import numpy as np
@@ -25,19 +26,30 @@ def _top_k(chunks: list[Chunk], scores: np.ndarray, k: int) -> list[Hit]:
 
 
 class BM25Retriever:
-    def __init__(self) -> None:
+    def __init__(self, analyzer: Callable[[str], list[str]] = tokenize) -> None:
+        self.analyzer = analyzer
         self._chunks: list[Chunk] = []
         self._bm25: BM25Okapi | None = None
 
     def index(self, chunks: list[Chunk]) -> None:
         self._chunks = list(chunks)
-        self._bm25 = BM25Okapi([tokenize(c.text) for c in self._chunks])
+        self._bm25 = BM25Okapi([self.analyzer(c.text) for c in self._chunks])
 
     def search(self, query: str, k: int) -> list[Hit]:
         if self._bm25 is None:
             raise RuntimeError("BM25Retriever.search called before index")
-        scores = np.asarray(self._bm25.get_scores(tokenize(query)), dtype=np.float64)
-        return _top_k(self._chunks, scores, k)
+        terms = self.analyzer(query)
+        scores = np.asarray(self._bm25.get_scores(terms), dtype=np.float64)
+        order = np.argsort(-scores, kind="stable")[:k]
+        # A chunk sharing no term with the query is not a hit: padding the top-k with such
+        # chunks would hand them rank credit in a hybrid fusion. Term overlap is tested
+        # directly because BM25 scores can be <= 0 for terms present in most documents.
+        frequencies = self._bm25.doc_freqs
+        return [
+            Hit(self._chunks[i], float(scores[i]))
+            for i in order
+            if any(term in frequencies[i] for term in terms)
+        ]
 
 
 class DenseRetriever:
