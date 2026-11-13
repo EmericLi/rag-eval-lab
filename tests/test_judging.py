@@ -159,3 +159,21 @@ def test_verdict_with_whitespace_only_reference_skips_correctness():
     verdict = _judge(transport).verdict("Q ?", PASSAGES, "a", "   \n")
     assert verdict.correctness is None
     assert len(transport.prompts) == 1
+
+
+def test_judge_retry_samples_instead_of_repeating_the_same_request():
+    options = []
+
+    class Transport:
+        def __init__(self):
+            self.responses = ["bruit", '{"correct": true, "reason": "r"}']
+
+        def __call__(self, method, path, payload):
+            options.append(payload["options"])
+            return {"response": self.responses.pop(0)}
+
+    judge = OllamaJudge(OllamaClient(transport=Transport(), retries=0), "m", retries=1)
+    assert judge.verdict("Q ?", [], "a", "ref").correctness is True
+    assert options[0]["temperature"] == 0.0
+    assert options[1]["temperature"] > 0.0
+    assert options[1]["seed"] != options[0]["seed"]

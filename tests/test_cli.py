@@ -54,3 +54,11 @@ def test_cli_report_without_results(tmp_path):
     (tmp_path / "results.jsonl").write_text("", encoding="utf-8")
     result = runner.invoke(app, ["report", str(tmp_path)])
     assert result.exit_code == 1
+
+
+def test_cli_run_exits_1_when_every_configuration_fails(tmp_path, mini_jsonl, monkeypatch):
+    from rag_eval_lab import cli
+
+    monkeypatch.setattr(cli, "run_experiment", lambda cfg, out: [{"status": "error"}])
+    config = _write_config(tmp_path, mini_jsonl, ["bm25"])
+    assert runner.invoke(app, ["run", str(config), "--out", str(tmp_path / "out")]).exit_code == 1

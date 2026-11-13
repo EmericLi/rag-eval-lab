@@ -3,6 +3,7 @@ import json
 import logging
 
 from rag_eval_lab import generation_experiment
+from rag_eval_lab import generation_experiment as generation_experiment_module
 from rag_eval_lab.generation_config import ContextConfig, GenerationConfig
 from rag_eval_lab.generation_experiment import (
     _append,
@@ -419,3 +420,21 @@ def test_run_judging_uses_the_reference_stored_in_the_answer(mini_jsonl, tmp_pat
     transport = JudgeTransport()
     run_judging(cfg, out, client=_client(transport))
     assert any("Le volcan est un sujet important." in p for p in transport.prompts)
+
+
+def test_run_judging_rejudges_answers_judged_by_another_model(mini_jsonl, tmp_path):
+    out = tmp_path / "out"
+    cfg = _config(mini_jsonl, tmp_path)
+    run_generation(cfg, out, client=_client(FakeTransport()))
+    run_judging(cfg, out, client=_client(JudgeTransport()))
+    other = cfg.model_copy(update={"judge": cfg.judge.model_copy(update={"num_ctx": 4096})})
+    assert len(run_judging(other, out, client=_client(JudgeTransport()))) == 6
+    assert run_judging(other, out, client=_client(JudgeTransport())) == []
+
+
+def test_build_dataset_is_not_capped_at_the_v1_sample_size(mini_jsonl, tmp_path, monkeypatch):
+    monkeypatch.setattr(generation_experiment_module, "V1_SAMPLE_SIZE", 2)
+    cfg = _config(
+        mini_jsonl, tmp_path, dataset={"name": "jsonl", "path": str(mini_jsonl), "n_queries": 4}
+    )
+    assert len(build_dataset(cfg).queries) == 4

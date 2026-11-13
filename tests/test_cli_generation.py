@@ -135,3 +135,32 @@ def test_generate_exits_0_when_some_items_succeed(tmp_path, mini_jsonl, monkeypa
     assert "ok" in result.output
     assert "failed" in result.output
     assert "retry" in result.output.lower()
+
+
+def test_rerunning_a_finished_stage_is_a_success(tmp_path, mini_jsonl, monkeypatch):
+    from rag_eval_lab import cli
+
+    class FakeTransport:
+        def __call__(self, method, path, payload):
+            if path == "/api/tags":
+                return {"models": [{"name": "fake-model", "digest": "0123456789abcdef"}]}
+            prompt = payload["prompt"]
+            if "faithful" in prompt:
+                return {"response": '{"faithful": true, "relevant": true, "reason": "ok"}'}
+            if "correct" in prompt:
+                return {"response": '{"correct": true, "reason": "ok"}'}
+            return {"response": "réponse", "eval_count": 3, "prompt_eval_count": 10}
+
+    monkeypatch.setattr(
+        cli,
+        "build_client",
+        lambda timeout_s: cli.OllamaClient(transport=FakeTransport(), retries=0),
+    )
+    config = _write_config(tmp_path, mini_jsonl)
+    out = tmp_path / "results"
+    generate = ["generate", str(config), "--out", str(out)]
+    judge = ["judge", str(out), str(config)]
+    assert runner.invoke(app, generate).exit_code == 0
+    assert runner.invoke(app, generate).exit_code == 0  # nothing left: still a success
+    assert runner.invoke(app, judge).exit_code == 0
+    assert runner.invoke(app, judge).exit_code == 0

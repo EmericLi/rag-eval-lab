@@ -43,6 +43,8 @@ def run(
     records = run_experiment(cfg, out_dir)
     failed = [r for r in records if r["status"] == "error"]
     typer.echo(f"{len(records)} configuration(s) run, {len(failed)} failed -> {out_dir}")
+    if records and len(failed) == len(records):
+        raise typer.Exit(code=1)
 
 
 @app.command()
@@ -96,7 +98,7 @@ def generate(
     )
     if failed:
         typer.echo("Re-run the same command to retry only the failed items.")
-    if len(failed) == len(records):
+    if records and len(failed) == len(records):  # nothing left to do is a success
         raise typer.Exit(code=1)
 
 
@@ -124,7 +126,7 @@ def judge(
     )
     if failed:
         typer.echo("Re-run the same command to retry only the failed items.")
-    if len(failed) == len(records):
+    if records and len(failed) == len(records):  # nothing left to do is a success
         raise typer.Exit(code=1)
 
 

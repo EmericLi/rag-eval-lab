@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -28,7 +29,9 @@ V1_SAMPLE_SIZE = 300
 
 def build_dataset(cfg: GenerationConfig) -> Dataset:
     requested = cfg.dataset.n_queries
-    base = load_benchmark(cfg.dataset.model_copy(update={"n_queries": V1_SAMPLE_SIZE}))
+    # Up to the v1 sample size, take a prefix of that sample; beyond it, sample directly.
+    size = None if requested is None else max(V1_SAMPLE_SIZE, requested)
+    base = load_benchmark(cfg.dataset.model_copy(update={"n_queries": size}))
     queries = base.queries if requested is None else base.queries[:requested]
     qrels = {q.id: base.qrels[q.id] for q in queries}
     return Dataset(name=base.name, documents=base.documents, queries=queries, qrels=qrels)
@@ -87,8 +90,8 @@ def _guarded_append_json_line(path: Path, record: dict) -> None:
         handle.write(prefix + json.dumps(record, ensure_ascii=False) + "\n")
 
 
-def _completed_ids(path: Path) -> set[str]:
-    """Ids of the answers already stored with status "ok".
+def _completed_ids(path: Path, keep: Callable[[dict], bool] | None = None) -> set[str]:
+    """Ids of the records already stored with status "ok" (and accepted by `keep`).
 
     A crash mid-write can leave a truncated line; it is skipped with a warning
     rather than making the whole run unresumable.
@@ -102,7 +105,7 @@ def _completed_ids(path: Path) -> set[str]:
             continue
         try:
             record = json.loads(line)
-            if record.get("status") == "ok":
+            if record.get("status") == "ok" and (keep is None or keep(record)):
                 done.add(record["answer_id"])
         except (json.JSONDecodeError, AttributeError, KeyError):
             logger.warning("skipping unreadable line %d of %s", number, path)
@@ -215,11 +218,27 @@ def run_judging(
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     judgments_path = out_dir / "judgments.jsonl"
-    done = _completed_ids(judgments_path)
+
+    def same_judge(record: dict) -> bool:
+        # A judgment made by another model, prompt or window is stale: judge again.
+        judge_info = record.get("judge") or {}
+        return (
+            record.get("prompt_version") == JUDGE_PROMPT_VERSION
+            and judge_info.get("model") == cfg.judge.model
+            and judge_info.get("num_ctx") == cfg.judge.num_ctx
+        )
+
+    done = _completed_ids(judgments_path, keep=same_judge)
 
     client = client or OllamaClient(timeout_s=cfg.judge.timeout_s)
     digest = client.model_digest(cfg.judge.model)
-    judge = OllamaJudge(client, cfg.judge.model, cfg.judge.max_tokens, num_ctx=cfg.judge.num_ctx)
+    judge = OllamaJudge(
+        client,
+        cfg.judge.model,
+        cfg.judge.max_tokens,
+        num_ctx=cfg.judge.num_ctx,
+        temperature=cfg.judge.temperature,
+    )
 
     records: list[dict] = []
     answers = [a for a in load_answers(out_dir) if a["answer_id"] not in done]

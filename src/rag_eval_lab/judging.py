@@ -64,6 +64,7 @@ class OllamaJudge:
         max_tokens: int = 200,
         retries: int = 2,
         num_ctx: int = 8192,
+        temperature: float = 0.0,
     ) -> None:
         if retries < 0:
             raise ValueError(f"Invalid judge: retries={retries}")
@@ -72,6 +73,7 @@ class OllamaJudge:
         self.max_tokens = max_tokens
         self.retries = retries
         self.num_ctx = num_ctx
+        self.temperature = temperature
 
     def _ask(
         self, prompt: str, keys: tuple[str, ...], bool_keys: tuple[str, ...] = ()
@@ -79,14 +81,16 @@ class OllamaJudge:
         last: JudgeParseError | None = None
         latency = 0.0
         prompt_tokens = 0
-        for _ in range(self.retries + 1):
+        for attempt in range(self.retries + 1):
             completion = self.client.generate(
                 self.model,
                 prompt,
-                temperature=0.0,
+                # Greedy decoding repeats the same unusable output, so a retry must sample.
+                temperature=self.temperature if attempt == 0 else max(self.temperature, 0.3),
                 max_tokens=self.max_tokens,
                 json_mode=True,
                 num_ctx=self.num_ctx,
+                seed=attempt,
             )
             latency += completion.latency_ms
             prompt_tokens += completion.prompt_eval_count
