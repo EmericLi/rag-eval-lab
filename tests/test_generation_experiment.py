@@ -6,14 +6,13 @@ from rag_eval_lab import generation_experiment
 from rag_eval_lab import generation_experiment as generation_experiment_module
 from rag_eval_lab.generation_config import ContextConfig, GenerationConfig
 from rag_eval_lab.generation_experiment import (
-    _append,
     _completed_ids,
-    _guarded_append_json_line,
     build_dataset,
     load_answers,
     run_generation,
     run_judging,
 )
+from rag_eval_lab.jsonl import append_record as _append
 from rag_eval_lab.ollama_client import OllamaClient
 from rag_eval_lab.pipeline import RetrievalPipeline
 from rag_eval_lab.prompts import ANSWER_PROMPT_VERSION, JUDGE_PROMPT_VERSION
@@ -154,20 +153,6 @@ def test_append_does_not_add_a_blank_line_to_a_clean_file(tmp_path):
     text = path.read_text(encoding="utf-8")
     assert len(text.splitlines()) == 2
     assert "\n\n" not in text
-
-
-def test_append_uses_guarded_append_helper(tmp_path):
-    """Verify that _append uses the shared _guarded_append_json_line helper."""
-    path = tmp_path / "answers.jsonl"
-    # _append should produce the same result as the helper
-    _append(path, _ok("a"))
-    result_via_append = path.read_text(encoding="utf-8")
-
-    path.unlink()
-    _guarded_append_json_line(path, _ok("a"))
-    result_via_helper = path.read_text(encoding="utf-8")
-
-    assert result_via_append == result_via_helper
 
 
 def test_run_generation_resumes_after_a_truncated_line(mini_jsonl, tmp_path):

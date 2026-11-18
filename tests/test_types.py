@@ -3,7 +3,7 @@ from rag_eval_lab.types import Chunk, Hit
 
 
 def test_version():
-    assert rag_eval_lab.__version__ == "0.1.0"
+    assert rag_eval_lab.__version__ == "0.2.0"
 
 
 def test_hit_is_hashable_and_comparable():

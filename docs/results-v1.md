@@ -8,9 +8,10 @@
 | Corpus | 2,556 French school-help documents, indexed as `title + "\n\n" + text` |
 | Queries | 300 sampled student questions (seed 42), out of 2,316 |
 | Relevance | document-level, as published with the dataset |
-| Grid | 3 chunkers × 4 retrievers × 2 rerankers, minus 4 excluded = 20 configurations |
+| Grid | 3 chunkers × 6 retrievers × 2 rerankers, minus 6 excluded = 30 configurations |
 | Chunk sizes | characters: `fixed_1000_200` (1,000 chars, 200 overlap), `recursive_1000` |
 | Candidates reranked | 30 chunks |
+| Lexical | `bm25`: lowercase word tokens only (the first baseline). `bm25-fr`: accents folded, French function words dropped, plural s/x stripped |
 | Encoders | `intfloat/multilingual-e5-small`, `BAAI/bge-m3`, both capped at `max_seq_length = 512` tokens |
 | Reranker | `cross-encoder/mmarco-mMiniLMv2-L12-H384-v1` |
 | Hardware | AMD Ryzen 7 8845HS, 28 GB RAM, CPU only (no GPU) |
@@ -21,81 +22,110 @@ Per-run provenance (library versions, git commit, hardware) is stored in every r
 
 ## Main results
 
-Ranked by nDCG@10 (full table: [`results/v1/report.md`](../results/v1/report.md)).
+Ranked by nDCG@10; a selection of the 30 rows (full table:
+[`results/v1/report.md`](../results/v1/report.md)).
 
 | # | Chunker | Retriever | Reranker | nDCG@10 | MRR@10 | R@5 | R@10 | p50 (ms) | p95 (ms) |
 |---|---|---|---|---|---|---|---|---|---|
-| 1 | fixed_1000_200 | dense:bge-m3 | none | **0.554** | 0.522 | 0.635 | 0.709 | 221 | 336 |
-| 2 | none | dense:bge-m3 | none | 0.545 | 0.516 | 0.616 | 0.693 | 286 | 446 |
-| 3 | none | hybrid:bm25+bge-m3 | none | 0.542 | 0.509 | 0.608 | **0.713** | 309 | 510 |
-| 4 | recursive_1000 | dense:bge-m3 | none | 0.538 | 0.508 | 0.618 | 0.688 | 218 | 333 |
-| 5 | fixed_1000_200 | hybrid:bm25+bge-m3 | none | 0.527 | 0.490 | 0.609 | 0.702 | 309 | 679 |
-| 7 | fixed_1000_200 | hybrid:bm25+bge-m3 | minilm | 0.521 | 0.479 | 0.592 | 0.710 | 2,276 | 3,029 |
-| 9 | fixed_1000_200 | dense:bge-m3 | minilm | 0.504 | 0.461 | 0.574 | 0.695 | 2,348 | 2,778 |
-| 11 | fixed_1000_200 | bm25 | minilm | 0.433 | 0.417 | 0.478 | 0.551 | 2,310 | 3,243 |
-| 14 | none | bm25 | none | 0.351 | 0.323 | 0.410 | 0.502 | **25** | 98 |
-| 18 | none | dense:e5-small | none | 0.328 | 0.303 | 0.389 | 0.455 | **18** | 33 |
-| 20 | fixed_1000_200 | dense:e5-small | none | 0.311 | 0.276 | 0.362 | 0.454 | 20 | 35 |
+| 1 | none | hybrid:bm25-fr+bge-m3 | none | **0.571** | 0.531 | 0.643 | **0.762** | 152 | 280 |
+| 2 | fixed_1000_200 | dense:bge-m3 | none | 0.554 | 0.522 | 0.635 | 0.709 | 188 | 367 |
+| 3 | fixed_1000_200 | hybrid:bm25-fr+bge-m3 | none | 0.554 | 0.521 | 0.632 | 0.716 | 188 | 420 |
+| 5 | none | dense:bge-m3 | none | 0.545 | 0.516 | 0.616 | 0.693 | 230 | 464 |
+| 6 | none | hybrid:bm25+bge-m3 | none | 0.542 | 0.509 | 0.608 | 0.713 | 264 | 576 |
+| 14 | fixed_1000_200 | dense:bge-m3 | minilm | 0.504 | 0.461 | 0.574 | 0.695 | 2,348 | 2,778 |
+| 15 | fixed_1000_200 | bm25-fr | minilm | 0.495 | 0.463 | 0.562 | 0.654 | 1,901 | 3,104 |
+| 18 | fixed_1000_200 | bm25-fr | none | 0.453 | 0.416 | 0.525 | 0.633 | 42 | 152 |
+| 19 | none | bm25-fr | none | 0.452 | 0.413 | 0.511 | 0.643 | 7 | 25 |
+| 21 | fixed_1000_200 | bm25 | minilm | 0.433 | 0.417 | 0.478 | 0.551 | 2,310 | 3,243 |
+| 24 | none | bm25 | none | 0.351 | 0.323 | 0.410 | 0.502 | 20 | 71 |
+| 28 | none | dense:e5-small | none | 0.328 | 0.303 | 0.389 | 0.455 | 26 | 48 |
 
 ![Quality vs latency](../results/v1/pareto.png)
 
-Only 4 of the 20 configurations are on the Pareto front: `e5-small` (18 ms), `bm25` (25 ms),
-`recursive_1000 + bge-m3` (218 ms) and `fixed_1000_200 + bge-m3` (221 ms). Every reranked
-configuration is dominated.
+Only 4 of the 30 configurations are on the quality/latency Pareto front: `none + bm25-fr` (7 ms, 0.452), `fixed_1000_200 + bm25-fr` (42 ms, 0.453), `recursive_1000 + dense:bge-m3` (144 ms, 0.538), `none + hybrid:bm25-fr+bge-m3` (152 ms, 0.571). Every reranked configuration is dominated. All non-reranked latencies were measured in one session; reranked ones in an earlier session on the same machine.
 
 ## Findings
 
-### 1. The embedding model decides, not the lexical/dense dichotomy
+### 1. An untuned baseline had inflated the headline
 
-bge-m3 beats BM25 by **+58%** nDCG@10 (0.554 vs 0.351), but e5-small — also a dense
-bi-encoder — scores **below** BM25 (0.328 vs 0.351). "Switching to dense retrieval" is not a
-decision by itself: the same architecture spans the best and the worst results in this grid.
-Model capacity matters here (bge-m3: 568M parameters, 1024-dim; e5-small: 118M, 384-dim), and
-so does multilingual training quality on French.
+The first version of this benchmark reported that bge-m3 beat BM25 by +58% nDCG@10
+(0.554 vs 0.351). That BM25 only lowercased the text and split it on word characters: no
+accent folding, no stop-word removal, no handling of plurals. "Je ne comprends pas bien les
+divisions" therefore never matched the fact sheet titled "La division", and "je", "ne", "pas"
+weighed as much as the one word that mattered.
 
-### 2. A reranker weaker than the retriever destroys the ranking
+`bm25-fr` adds the minimum a French lexical baseline needs — accents folded, about 130
+function words dropped, a trailing plural s/x stripped — in some thirty lines of code:
 
-| First stage | nDCG@10 without reranker | with `minilm` | Δ | latency p50 |
-|---|---|---|---|---|
-| bm25 (fixed_1000_200) | 0.349 | 0.433 | **+24%** | 105 → 2,310 ms |
-| hybrid bm25+bge-m3 (fixed_1000_200) | 0.527 | 0.521 | −1% | 309 → 2,276 ms |
-| dense bge-m3 (fixed_1000_200) | 0.554 | 0.504 | **−9%** | 221 → 2,348 ms |
+| Chunker | `bm25` (raw) | `bm25-fr` | Δ |
+|---|---|---|---|
+| none | 0.351 | 0.452 | **+29%** |
+| fixed_1000_200 | 0.349 | 0.453 | +30% |
+| recursive_1000 | 0.342 | 0.433 | +27% |
 
-Reranking is usually presented as a free quality gain. It is not: `mmarco-mMiniLMv2` rescues a
-weak lexical first stage (+24%) but degrades a strong dense one (−9%), while multiplying
-latency by 11. A cross-encoder only helps when it is more accurate than the ranking it
+Against a baseline that has been given a fair chance, bge-m3 leads by **+22%** (0.554 vs 0.453
+at `fixed_1000_200`), not +58%. Two thirds of the original gap was the tokenizer. The raw
+`bm25` stays in the grid on purpose: the difference between the two rows is the cost of not
+tuning a baseline, and it is the easiest mistake to make in a benchmark of this kind.
+
+### 2. The embedding model decides, not the lexical/dense dichotomy
+
+bge-m3 scores 22% above a tuned BM25; e5-small — also a dense bi-encoder — scores **27% below
+it** (0.328 vs 0.452). "Switching to dense retrieval" is not a decision by itself: the same
+architecture spans the best and the worst results in this grid. Model capacity matters here
+(bge-m3: 568M parameters, 1024-dim; e5-small: 118M, 384-dim), and so does multilingual
+training quality on French.
+
+### 3. A reranker only helps a first stage weaker than itself
+
+All four at `fixed_1000_200`, reranking the top 30 chunks with `mmarco-mMiniLMv2`:
+
+| First stage | nDCG@10 without reranker | with `minilm` | Δ |
+|---|---|---|---|
+| bm25 (raw) | 0.349 | 0.433 | **+24%** |
+| bm25-fr | 0.453 | 0.495 | +9% |
+| hybrid bm25-fr+bge-m3 | 0.554 | 0.520 | −6% |
+| dense bge-m3 | 0.554 | 0.504 | **−9%** |
+
+The gain shrinks as the first stage improves and turns negative once the first stage is
+better than the reranker, while every reranked configuration costs about two more seconds per
+query on this CPU. A cross-encoder only helps when it is more accurate than the ranking it
 rewrites — and reranking the top 30 also caps recall at what the first stage already found.
 
-### 3. Hybrid search pays only when both sides are comparable
+### 4. Hybrid search pays once the lexical side is competent
 
-With bge-m3, hybrid RRF matches the dense retriever (0.542 vs 0.545) and adds ~90 ms. Yet the
-two systems are genuinely complementary. Measured on hit@10 over the 300 queries, all at
-`chunker: none` so the three systems are compared like for like:
+Fused with the raw BM25, RRF only matched the dense retriever (0.542 vs 0.545). Fused with
+`bm25-fr`, the same fusion is the best configuration of the grid: **0.571 nDCG@10 and 0.762
+recall@10, against 0.545 and 0.693 for bge-m3 alone**. Nothing changed but the tokenizer of
+one side.
 
-| | queries solved (hit@10) |
-|---|---|
-| dense bge-m3 | 221 / 300 |
-| bm25 | 164 / 300 |
-| hybrid (RRF) | 226 / 300 |
-| **union of dense and bm25 (oracle)** | **244 / 300** |
+Hit@10 over the 300 queries, all at `chunker: none` so the systems are compared like for like:
 
-The net gain of fusion (+5 queries) hides a much larger churn. 23 queries are solved by BM25
-alone — typically those carrying an exact lexical cue. Equal-weight RRF **recovers 16 of those
-23, but forfeits 21 queries that the dense retriever alone got right**: a rank-3 hit in the
-strong system is dragged out of the top 10 by a weak system's confident-but-wrong ranking,
-because RRF weighs both sides identically while one is 35% more accurate.
+| | with `bm25` (raw) | with `bm25-fr` |
+|---|---|---|
+| dense bge-m3 alone | 221 | 221 |
+| lexical alone | 164 | 206 |
+| hybrid (RRF) | 226 | **241** |
+| union of dense and lexical (oracle) | 244 | 251 |
+| lexical-only queries recovered by fusion | 16 of 23 | 24 of 30 |
+| dense-only queries forfeited by fusion | 21 | 13 |
 
-The same churn appears with the other chunkers (`fixed_1000_200`: 12 recovered / 21 forfeited;
-`recursive_1000`: 14 / 17), so it is a property of the fusion, not of one configuration.
+Equal-weight RRF trades hits in both directions: it recovers queries only the lexical side
+solved, and forfeits queries only the dense side solved, because a confident-but-wrong ranking
+from one side drags a correct hit out of the top 10. With a weak lexical side the trade is
+almost neutral (+16 −21 around a net +5); with a competent one it is clearly positive
+(+24 −13, net +20). The same pattern holds with the other chunkers (`fixed_1000_200`: 16
+recovered, 15 forfeited; `recursive_1000`: 21 and 9).
 
-**6 points of hit@10 separate RRF from the oracle union** (226 → 244 of 300). That gap is the
-argument for weighted fusion or a learned gate rather than plain RRF — and it is invisible to
-the aggregate metrics, which show hybrid and dense as equivalent.
+Ten queries (3.3 points of hit@10) still separate RRF from the oracle union. Weighted fusion
+could claim part of that; it is a smaller prize than it looked when the lexical side was
+broken (18 queries, 6 points).
 
-### 4. Chunking's effect is entangled with the 512-token cap — and this grid cannot separate them
+### 5. Chunking's effect is entangled with the 512-token cap — and this grid cannot separate them
 
-Fixed-size chunking gives bge-m3 +1.7% (0.545 → 0.554) and costs BM25 nothing to −2%
-(0.351 → 0.349). That looks like "chunking barely matters here", but the comparison is
+Fixed-size chunking gives bge-m3 +1.7% (0.545 → 0.554), leaves both BM25 variants flat
+(0.452 → 0.453 for `bm25-fr`) and costs the best hybrid 3% (0.571 → 0.554). That looks like
+"chunking barely matters here", but the comparison is
 confounded, and the corpus statistics say why.
 
 Alloprof documents are **not** short: mean 3,541 characters, median 2,568, p90 7,550, max
@@ -110,21 +140,24 @@ Two consequences for reading this grid:
 - The +1.7% chunking gain is measured against a **truncated** baseline. Chunking's real effect
   on this corpus is unresolved, not small.
 - At `chunker: none`, BM25 indexes the full document text while the dense retriever sees a
-  prefix, so "e5-small scores below BM25" (0.328 vs 0.351) is not a like-for-like comparison
-  at that row. Finding 1's headline is unaffected: it rests on the best dense configuration,
-  which is chunked and therefore untruncated.
+  prefix, so "e5-small scores below BM25" is not a like-for-like comparison at that row. The
+  bge-m3-vs-BM25 gap of Finding 1 is unaffected: it is taken at `fixed_1000_200`, where both
+  sides index the whole corpus. The best hybrid, at `chunker: none`, combines a truncated dense
+  side with a full-text lexical side — which may be part of why it wins there.
 
 Separating the two effects needs one extra run with `max_seq_length: 8192` at
 `chunker: none` — the first thing v2 should measure.
 
-### 5. Practical recommendation
+### 6. Practical recommendation
 
 Pick by latency budget, not by reputation:
 
-- **< 30 ms**: `bm25` on whole documents (0.351). Free to index, no model to host.
-- **~220 ms**: `fixed_1000_200 + dense:bge-m3` (0.554). +58% quality for +200 ms — the best
-  trade in this grid.
-- **Reranking**: not worth it here (−9% quality, +2 s) unless the first stage is weak.
+- **A few milliseconds**: `bm25-fr` on whole documents (0.452). Free to index, no model to
+  host, and 29% better than the same algorithm without French analysis.
+- **A few hundred milliseconds**: `hybrid:bm25-fr+bge-m3` on whole documents (0.571, and the
+  best recall of the grid at 0.762).
+- **Reranking**: not worth it here (−6% to −9% on the strong first stages, +2 s) unless the
+  first stage is weak.
 
 ## Failure analysis
 

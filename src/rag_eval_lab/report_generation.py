@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import logging
 import statistics
 from pathlib import Path
@@ -15,6 +14,7 @@ import matplotlib.pyplot as plt  # noqa: E402
 from rag_eval_lab.annotation import load_annotations  # noqa: E402
 from rag_eval_lab.calibration import agreement, fisher_exact, wilson_interval  # noqa: E402
 from rag_eval_lab.generation_experiment import load_answers  # noqa: E402
+from rag_eval_lab.jsonl import latest_by, read_records  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
@@ -22,21 +22,9 @@ CRITERIA = ("faithfulness", "relevance", "correctness")
 
 
 def load_judgments(out_dir: Path) -> list[dict]:
-    """Last record per answer_id, successful ones only; unreadable lines are skipped."""
-    path = Path(out_dir) / "judgments.jsonl"
-    latest: dict[str, dict] = {}
-    if path.exists():
-        text = path.read_text(encoding="utf-8", errors="replace")
-        for number, line in enumerate(text.splitlines(), start=1):
-            if not line.strip():
-                continue
-            try:
-                record = json.loads(line)
-                if "answer_id" in record:
-                    latest[record["answer_id"]] = record
-            except (json.JSONDecodeError, TypeError, KeyError):
-                logger.warning("skipping unreadable line %d of %s", number, path)
-    return [r for r in latest.values() if r.get("status") == "ok"]
+    """Last record per answer_id, successful ones only."""
+    records = latest_by(read_records(Path(out_dir) / "judgments.jsonl"), "answer_id")
+    return [r for r in records if r.get("status") == "ok"]
 
 
 def _rate(values: list[bool | None]) -> float | None:

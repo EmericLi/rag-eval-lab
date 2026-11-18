@@ -18,6 +18,7 @@ from rag_eval_lab.chunking import parse_chunker
 from rag_eval_lab.config import ExperimentConfig, RunSpec
 from rag_eval_lab.data import load_benchmark
 from rag_eval_lab.factory import build_reranker, build_retriever
+from rag_eval_lab.jsonl import append_record, read_records
 from rag_eval_lab.metrics import evaluate
 from rag_eval_lab.pipeline import RetrievalPipeline
 from rag_eval_lab.types import Dataset
@@ -58,20 +59,11 @@ def environment_info() -> dict:
 
 
 def _completed_ids(results_path: Path) -> set[str]:
-    if not results_path.exists():
-        return set()
-    done = set()
-    for line in results_path.read_text(encoding="utf-8").splitlines():
-        if line.strip():
-            record = json.loads(line)
-            if record.get("status") == "ok":
-                done.add(record["config_id"])
-    return done
-
-
-def _append(results_path: Path, record: dict) -> None:
-    with results_path.open("a", encoding="utf-8") as f:
-        f.write(json.dumps(record, ensure_ascii=False) + "\n")
+    return {
+        record["config_id"]
+        for record in read_records(results_path)
+        if "config_id" in record and record.get("status") == "ok"
+    }
 
 
 def _run_one(
@@ -149,6 +141,6 @@ def run_experiment(
             logger.exception("Configuration failed: %s", label)
             record.update(status="error", error=f"{type(exc).__name__}: {exc}")
         record["timestamp"] = datetime.now(UTC).isoformat()
-        _append(results_path, record)
+        append_record(results_path, record)
         records.append(record)
     return records

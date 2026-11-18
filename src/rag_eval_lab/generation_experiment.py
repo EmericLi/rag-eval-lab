@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import logging
 from collections.abc import Callable
 from datetime import UTC, datetime
@@ -15,6 +14,7 @@ from rag_eval_lab.data import load_benchmark
 from rag_eval_lab.factory import build_retriever
 from rag_eval_lab.generation import OllamaGenerator
 from rag_eval_lab.generation_config import GenerationConfig
+from rag_eval_lab.jsonl import append_record, latest_by, read_records
 from rag_eval_lab.judging import JudgeParseError, OllamaJudge
 from rag_eval_lab.ollama_client import OllamaClient, OllamaError
 from rag_eval_lab.pipeline import RetrievalPipeline
@@ -73,48 +73,13 @@ def build_context_sources(
     return sources
 
 
-def _guarded_append_json_line(path: Path, record: dict) -> None:
-    """Append a JSON record as a line, guarding against torn fragments.
-
-    If the file is non-empty and doesn't end with a newline (from a previous crash),
-    prepend a newline before writing the new record. This ensures each record is
-    on its own line and protects against merging into a torn fragment.
-    """
-    prefix = ""
-    if path.exists() and path.stat().st_size > 0:
-        with path.open("rb") as handle:
-            handle.seek(-1, 2)
-            if handle.read(1) != b"\n":
-                prefix = "\n"  # a crash left an unterminated fragment: do not merge into it
-    with path.open("a", encoding="utf-8") as handle:
-        handle.write(prefix + json.dumps(record, ensure_ascii=False) + "\n")
-
-
 def _completed_ids(path: Path, keep: Callable[[dict], bool] | None = None) -> set[str]:
-    """Ids of the records already stored with status "ok" (and accepted by `keep`).
-
-    A crash mid-write can leave a truncated line; it is skipped with a warning
-    rather than making the whole run unresumable.
-    """
-    if not path.exists():
-        return set()
-    done = set()
-    text = path.read_text(encoding="utf-8", errors="replace")
-    for number, line in enumerate(text.splitlines(), start=1):
-        if not line.strip():
-            continue
-        try:
-            record = json.loads(line)
-            if record.get("status") == "ok" and (keep is None or keep(record)):
-                done.add(record["answer_id"])
-        except (json.JSONDecodeError, AttributeError, KeyError):
-            logger.warning("skipping unreadable line %d of %s", number, path)
-    return done
-
-
-def _append(path: Path, record: dict) -> None:
-    """Append a JSON record to a file, using the guarded append helper."""
-    _guarded_append_json_line(path, record)
+    """Ids of the records already stored with status "ok" (and accepted by `keep`)."""
+    return {
+        record["answer_id"]
+        for record in read_records(path)
+        if "answer_id" in record and record.get("status") == "ok" and (keep is None or keep(record))
+    }
 
 
 def run_generation(
@@ -187,7 +152,7 @@ def run_generation(
                     logger.exception("generation failed for %s / %s", source.name, query.id)
                 record.update(status="error", error=f"{type(exc).__name__}: {exc}")
             record["timestamp"] = datetime.now(UTC).isoformat()
-            _append(answers_path, record)
+            append_record(answers_path, record)
             records.append(record)
             if n % 10 == 0:
                 logger.info("context %s: %d/%d", source.name, n, len(dataset.queries))
@@ -195,20 +160,9 @@ def run_generation(
 
 
 def load_answers(out_dir: Path) -> list[dict]:
-    """Last record per answer_id, successful ones only; unreadable lines are skipped."""
-    path = Path(out_dir) / "answers.jsonl"
-    latest: dict[str, dict] = {}
-    if path.exists():
-        text = path.read_text(encoding="utf-8", errors="replace")
-        for number, line in enumerate(text.splitlines(), start=1):
-            if not line.strip():
-                continue
-            try:
-                record = json.loads(line)
-                latest[record["answer_id"]] = record
-            except (json.JSONDecodeError, TypeError, KeyError):
-                logger.warning("skipping unreadable line %d of %s", number, path)
-    return [r for r in latest.values() if r.get("status") == "ok"]
+    """Last record per answer_id, successful ones only."""
+    records = latest_by(read_records(Path(out_dir) / "answers.jsonl"), "answer_id")
+    return [r for r in records if r.get("status") == "ok"]
 
 
 def run_judging(
@@ -277,7 +231,7 @@ def run_judging(
                 raw_output=getattr(exc, "raw_output", ""),
             )
         record["timestamp"] = datetime.now(UTC).isoformat()
-        _append(judgments_path, record)
+        append_record(judgments_path, record)
         records.append(record)
         if n % 10 == 0:
             logger.info("judged %d/%d", n, len(answers))

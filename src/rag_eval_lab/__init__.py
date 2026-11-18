@@ -1,3 +1,3 @@
-"""Benchmark RAG retrieval pipelines on French data."""
+"""Measure a French RAG pipeline: retrieval, generation and judge calibration."""
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"

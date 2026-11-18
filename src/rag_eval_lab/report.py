@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 import matplotlib
@@ -10,15 +9,12 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
+from rag_eval_lab.jsonl import latest_by, read_records  # noqa: E402
+
 
 def load_results(results_dir: Path) -> list[dict]:
-    latest: dict[str, dict] = {}
-    path = Path(results_dir) / "results.jsonl"
-    for line in path.read_text(encoding="utf-8").splitlines():
-        if line.strip():
-            record = json.loads(line)
-            latest[record["config_id"]] = record
-    return [r for r in latest.values() if r.get("status") == "ok"]
+    records = latest_by(read_records(Path(results_dir) / "results.jsonl"), "config_id")
+    return [r for r in records if r.get("status") == "ok"]
 
 
 def pareto_front(points: list[tuple[float, float]]) -> set[int]:

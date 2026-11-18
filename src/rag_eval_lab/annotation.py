@@ -2,17 +2,14 @@
 
 from __future__ import annotations
 
-import json
-import logging
 import random
 import time
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 
-from rag_eval_lab.generation_experiment import _guarded_append_json_line, load_answers
-
-logger = logging.getLogger(__name__)
+from rag_eval_lab.generation_experiment import load_answers
+from rag_eval_lab.jsonl import append_record, latest_by, read_records
 
 ANSWERS = {"o": True, "n": False, "?": None}
 VIEW_KEY = "v"
@@ -43,31 +40,14 @@ def sample_for_annotation(answers: list[dict], n: int, seed: int) -> list[dict]:
 
 
 def load_annotations(out_dir: Path) -> list[dict]:
-    """Last record per answer_id; unreadable lines are skipped with a warning.
-
-    Re-labelling replaces the earlier label. A Ctrl-C during a write can leave a torn
-    line, which must not break resuming or the report (same policy as load_answers).
-    """
-    path = Path(out_dir) / "annotations.jsonl"
-    if not path.exists():
-        return []
-    latest: dict[str, dict] = {}
-    text = path.read_text(encoding="utf-8", errors="replace")
-    for number, line in enumerate(text.splitlines(), start=1):
-        if not line.strip():
-            continue
-        try:
-            record = json.loads(line)
-            latest[record["answer_id"]] = record
-        except (json.JSONDecodeError, TypeError, KeyError):
-            logger.warning("skipping unreadable line %d of %s", number, path)
-    return list(latest.values())
+    """Last record per answer_id: re-labelling an answer replaces the earlier label."""
+    return latest_by(read_records(Path(out_dir) / "annotations.jsonl"), "answer_id")
 
 
 def append_annotation(out_dir: Path, record: dict) -> None:
     path = Path(out_dir) / "annotations.jsonl"
     path.parent.mkdir(parents=True, exist_ok=True)
-    _guarded_append_json_line(path, record)
+    append_record(path, record)
 
 
 def _passage_view(text: str, full: bool) -> str:

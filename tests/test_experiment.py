@@ -69,3 +69,13 @@ def test_run_experiment_records_errors_and_retries(tmp_path, mini_jsonl, monkeyp
 def test_environment_info_keys():
     info = environment_info()
     assert {"python", "platform", "processor", "git_commit", "packages"} <= set(info)
+
+
+def test_run_experiment_resumes_after_a_truncated_results_line(tmp_path, mini_jsonl):
+    out = tmp_path / "out"
+    cfg = _config(mini_jsonl, tmp_path)
+    run_experiment(cfg, out)
+    results = out / "results.jsonl"
+    with results.open("a", encoding="utf-8") as handle:
+        handle.write('{"config_id": "torn", "sta')  # a killed run leaves this behind
+    assert run_experiment(cfg, out) == []  # still resumable: nothing is recomputed

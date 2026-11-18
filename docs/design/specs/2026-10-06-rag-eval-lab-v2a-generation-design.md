@@ -1,7 +1,10 @@
 # rag-eval-lab v2a — Évaluation de la génération (design)
 
 Date : 2026-10-06
-Statut : validé en brainstorming, en attente de relecture
+Statut : implémenté en v2a. Écarts avec ce document : le bloc `annotation:` de la configuration a
+été retiré (`rel annotate` prend `--n` et `--seed`), `num_ctx` est explicite pour le générateur
+et le juge, et l'empreinte des prompts est scindée en deux (réponse, juge). Résultats et limites :
+`docs/results-v2.md`.
 Spec précédente : `docs/design/specs/2026-09-21-rag-eval-lab-design.md` (v1, retrieval)
 
 ## 1. Contexte et objectif

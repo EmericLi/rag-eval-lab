@@ -5,10 +5,10 @@
 | | |
 |---|---|
 | Dataset | `lyon-nlp/alloprof`, the first 30 queries of the v1 sample (seed 42) |
-| Contexts | 5: `none` (no passage), `bm25`, `e5-small`, `bge-m3` (the v1 best), `oracle` (labelled documents) |
+| Contexts | 5: `none` (no passage), `bm25` (the raw v1 tokenizer, not the tuned `bm25-fr` added since), `e5-small`, `bge-m3`, `oracle` (labelled documents) |
 | Generator | `llama3.2:latest` (3B), temperature 0, `num_ctx` 8192, max 300 tokens |
 | Judge | `llama3.1:8B`, temperature 0, `num_ctx` 8192, max 200 tokens |
-| Passages | 5 per answer; oracle chunks with `fixed_1000_200`, never ranked against the question |
+| Passages | 5 per answer; `oracle` takes the first `fixed_1000_200` chunks of the labelled documents, never ranked against the question |
 | Answers | 150 (30 × 5), 0 errors |
 | Human labels | 60, balanced across contexts, collected blind to the judge's verdicts |
 | Hardware | AMD Ryzen 7 8845HS, CPU only |
@@ -25,6 +25,22 @@ A negative κ means the judge agrees with a human **less often than chance would
 matrix shows why: of the 20 answers a human called unfaithful, `llama3.1:8B` recognised 2. It
 says "correct" more than twice as often as a human does (60.8% vs 27.5%). The bias is
 systematic and one-directional: this judge rewards fluent answers regardless of grounding.
+
+**Is this an artefact of how refusals were labelled? Partly, and not enough to change the
+verdict.** 29 of the 150 answers are refusals ("the extracts do not allow me to answer"). The
+annotation convention counted a refusal as faithful — it asserts nothing — and that convention
+was not given to the judge. Splitting the 48 faithfulness pairs:
+
+| Faithfulness pairs | n | Agreement | Cohen's κ | tp/fp/fn/tn |
+|---|---|---|---|---|
+| all | 48 | 0.396 | −0.308 | 17/18/11/2 |
+| refusals only | 9 | 0.222 | −0.235 | 2/1/6/0 |
+| substantive answers only | 39 | 0.436 | **−0.147** | 15/17/5/2 |
+
+Six of the eleven "judge too severe" disagreements are refusals, so part of the headline κ is
+a guideline mismatch rather than a judging error. On substantive answers alone the judge still
+agrees with a human less often than chance (κ = −0.147) and still waves through 17 of 19
+unfaithful answers. The honest summary is the pair (−0.308, −0.147), not the first number alone.
 
 **Consequence: every number this judge produced is unusable, including the ones in
 `results/v2/report-generation.md`.** They are kept in the repository as the evidence for this
@@ -47,11 +63,17 @@ judge column is its verdict over all 30 answers of that context, as published in
 | bge-m3 | 0.10 [0.02, 0.40] (10) | 0.567 | 0.58 [0.32, 0.81] (12) |
 
 Read by the judge, the benchmark says *retrieval is useless*: the closed-book context scores
-highest (0.833) and perfect retrieval (0.700) beats none of the retrievers convincingly.
+highest (0.833) and the labelled documents (0.700) beat none of the retrievers convincingly.
 That is the report a project without human calibration would have published.
 
-Read by a human, the benchmark says the opposite: closed-book is the **worst** setting (0.11),
-and perfect retrieval is **five times better** (0.58). Retrieval does help — when it is right.
+Read by a human, the benchmark says the opposite: closed-book sits at the bottom (0.11, one
+correct answer in nine) and the labelled documents at the top (0.58, seven in twelve).
+Retrieval does help — when it brings the right document.
+
+One row deserves to be read plainly rather than skipped: `bge-m3`, the best retriever of v1,
+scores 0.10 — as low as no context at all — while `bm25` reaches 0.30. With ten labels per
+context none of these gaps is significant, but the data gives no support to "a better
+retriever produced better answers" below the oracle. Only the oracle separates.
 
 Significance, Fisher's exact test on the human labels:
 
@@ -69,7 +91,7 @@ the 12 oracle answers and the 12 `bge-m3` answers share only half their queries,
 difficulty is confounded with context. Sampling the same queries across contexts would be the
 cheapest way to gain power at this sample size.
 
-So the "perfect retrieval beats the alternatives" direction is solid, and the fine ranking
+So the "labelled documents beat the alternatives" direction is solid, and the fine ranking
 between the three real retrievers is not: with 9–12 labels per context, those differences are
 noise. The headline of this version is the judge, not the retriever ranking.
 
@@ -85,8 +107,9 @@ retrieval quality:
 | **Contradicting a worked example** (`bge-m3`, answer `29aad9c3db05`) | "Convertir 0,15 g/L en % m/V" | Two passages solve the identical exercise by dividing by 10; the answer multiplied by 10 and returned 1.5% instead of 0.015% |
 
 This explains why better retrieval does not translate linearly into better answers here: with
-`oracle` passages the model still gets 42% of answers wrong. The bottleneck at this model size
-is the generator's ability to exploit its context, not the retriever.
+the labelled documents in its prompt the model still gets 42% of answers wrong. Retrieval is
+necessary — closed-book is at the bottom — but at this model size it is not sufficient: the
+second bottleneck is the generator's ability to exploit what it is given.
 
 ## Limitations
 
@@ -99,6 +122,21 @@ is the generator's ability to exploit its context, not the retriever.
   to win. The labels are blind to the *judge's* verdicts, which is what the calibration
   requires, but not to the experimental condition, which Finding 2 rests on. The display has
   since been changed; a future round will be blind on both counts.
+- **The answer prompt licenses a refusal only when passages are given.** With context the
+  model is told to say so "if the extracts do not allow an answer"; the closed-book prompt has
+  no such exit. Refusals are counted as incorrect, and they are not evenly spread: 9 of 30
+  `oracle` answers, 7 `bge-m3`, 6 `bm25`, 5 `e5-small`, against 2 closed-book. Part of
+  Finding 3 is therefore the prompt doing what it was asked; a variant without the refusal
+  clause would be needed to separate the two.
+- **`oracle` is the right document, not the right passage.** It takes the first five
+  `fixed_1000_200` chunks of the labelled documents. For 11 of the 30 queries those chunks
+  cover only part of the labelled text, so the answer may sit outside what the model saw.
+  "Upper bound" overstates it; "labelled documents, beginning first" is exact.
+- **Some labels were discussed with an AI assistant.** While annotating, the author asked an
+  assistant how to apply the criteria on roughly eight of the sixty items, and it suggested
+  labels for several. The assistant read the answers and passages, never the judge's verdicts,
+  so the calibration stays blind to the judge; but those labels are not an independent human
+  judgement, and the refusal convention above was settled during that exchange.
 - **Contexts differ by chunking as well as by retriever.** `bm25` and `e5-small` index whole
   documents (`chunker: none`, the v1 best for each), `bge-m3` and `oracle` use
   `fixed_1000_200`. Their prompts therefore differ by a factor of five in size (median 23,048
