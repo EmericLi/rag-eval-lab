@@ -29,7 +29,8 @@ systematic and one-directional: this judge rewards fluent answers regardless of 
 **Is this an artefact of how refusals were labelled? Partly, and not enough to change the
 verdict.** 29 of the 150 answers are refusals ("the extracts do not allow me to answer"). The
 annotation convention counted a refusal as faithful — it asserts nothing — and that convention
-was not given to the judge. Splitting the 48 faithfulness pairs:
+was not given to the judge. Splitting the 48 faithfulness pairs (the refusal rule and this
+split are reproduced by `scripts/refusals.py`):
 
 | Faithfulness pairs | n | Agreement | Cohen's κ | tp/fp/fn/tn |
 |---|---|---|---|---|
@@ -200,7 +201,7 @@ models than for larger ones", and they "struggle with under-specified answers an
 lenient".
 
 It does not support the magnitude found here, and the difference is informative. Their
-Llama-3 8B reaches a Scott's π of 0.59–0.78 against a human-human π of 96.2, far above the
+Llama-3 8B reaches a Scott's π of 0.59–0.78 against a human-human π of 0.962, far above the
 κ = −0.308 measured here. Their task is deliberately easy — answer correctness against a
 reference string — while faithfulness requires checking every claim against five passages.
 Their paper evaluates no RAG setting and no groundedness criterion at all. A note on metrics:
@@ -217,7 +218,10 @@ generalise.
 
 1. A stronger judge (`llama3.1:70B` through a free API tier, or a calibrated prompt with
    few-shot examples) measured against the same 60 labels — the harness already supports it.
-2. A larger generator (8B) on the oracle context, to separate "the model cannot use context"
+2. The same answer prompt without its refusal clause, to separate what the prompt asks for
+   from what the generator fails to do (Finding 3).
+3. A larger generator (8B) on the oracle context, to separate "the model cannot use context"
    from "3B cannot use context".
-3. More human labels on the two extreme contexts only (oracle and closed-book), which is where
-   the signal is, rather than spreading labels across five contexts.
+4. A new annotation round blind to the context, on the same questions for every context, so
+   the comparison is paired; labels go first to the two extreme contexts (oracle and
+   closed-book), which is where the signal is.

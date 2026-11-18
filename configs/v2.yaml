@@ -2,8 +2,8 @@
 #
 # num_ctx is set explicitly: Ollama defaults to 2048 tokens and silently truncated the
 # whole-document contexts (bm25 ~6100 tokens, e5-small ~3600) in the first run, which
-# measured a client default instead of retrieval quality. At 8192, 10 of 200 prompts
-# still exceed the window; that is recorded as a limitation.
+# measured a client default instead of retrieval quality. At 8192, an estimated 13 of the
+# 150 prompts (10 bm25, 3 e5-small) still exceed the window; that is recorded as a limitation.
 #
 # n_queries sized on this machine (Ryzen 7 8845HS, CPU only). With the 2048-token
 # default, a query cost ~190 s of generation and ~520 s of judging across the five

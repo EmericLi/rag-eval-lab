@@ -126,6 +126,14 @@ def test_model_digest_finds_the_model():
     assert OllamaClient(transport=transport).model_digest("llama3.2:latest") == "0123456789ab"
 
 
+def test_model_digest_ignores_case():
+    # configs/v2.yaml says `llama3.1:8B`; the README pulls `llama3.1:8b`
+    transport = FakeTransport(
+        {"/api/tags": {"models": [{"name": "llama3.1:8b", "digest": "f" * 16}]}}
+    )
+    assert OllamaClient(transport=transport).model_digest("llama3.1:8B") == "f" * 12
+
+
 def test_model_digest_names_the_pull_command():
     transport = FakeTransport({"/api/tags": {"models": []}})
     with pytest.raises(OllamaError, match="ollama pull mistral"):

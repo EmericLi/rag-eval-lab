@@ -114,7 +114,8 @@ class OllamaClient:
 
     def model_digest(self, model: str) -> str:
         data = self._call("GET", "/api/tags")
+        wanted = model.casefold()  # Ollama names are case-insensitive: `8B` and `8b` are one model
         for entry in data.get("models", []):
-            if model in (entry.get("name"), entry.get("model")):
+            if wanted in (str(entry.get("name")).casefold(), str(entry.get("model")).casefold()):
                 return str(entry.get("digest", "unknown"))[:12]
         raise OllamaError(f"model '{model}' is not installed. Run: ollama pull {model}")
