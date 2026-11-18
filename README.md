@@ -37,10 +37,10 @@ CPU only.
    page reported the +58%; both baselines are kept in the grid so the difference stays visible.
 2. **The embedding model decides, not "lexical vs dense".** bge-m3 scores 22% above a tuned
    BM25; e5-small, also a dense bi-encoder, scores 27% *below* it (0.328 vs 0.452).
-3. **Hybrid search pays once the lexical side is competent.** Fused with the raw BM25, RRF only
-   matched bge-m3 alone (0.542 vs 0.545), recovering 16 queries and forfeiting 21. Fused with
-   `bm25-fr` it is the best configuration of the grid: 0.571 nDCG@10 and 0.762 recall@10
-   against 0.545 and 0.693, recovering 24 and forfeiting 13.
+3. **Hybrid search pays once the lexical side is competent.** Without chunking, RRF fused with
+   the raw BM25 only matched bge-m3 alone (0.542 vs 0.545), recovering 16 queries and
+   forfeiting 21. Fused with `bm25-fr` it is the best configuration of the grid: 0.571
+   nDCG@10 and 0.762 recall@10 against 0.545 and 0.693, recovering 24 and forfeiting 13.
 4. **A reranker only helps a first stage weaker than itself.** `mmarco-mMiniLMv2` adds +24% to
    the raw BM25, +9% to the tuned one, and costs the hybrid −6% and bge-m3 −9% — for about
    two more seconds per query. Every reranked configuration is off the Pareto front.
@@ -66,10 +66,13 @@ the top (7 in 12).
 
 Three findings:
 
-1. **A free local judge cannot be trusted here, and the number says so**: agreement 0.40 with
-   a Cohen's κ of **−0.308** on faithfulness — worse than chance. Of 20 answers a human called
-   unfaithful, it recognised 2. It is systematically indulgent (says "correct" 61% of the
-   time against a human's 27%). Refusals excluded, κ is still negative (−0.147).
+1. **Calibration is what caught it.** Measured against the human labels, the free local judge
+   reaches an agreement of 0.40 and a Cohen's κ of **−0.308** on faithfulness — worse than
+   chance. Of 20 answers a human called unfaithful, it recognised 2. It is systematically
+   indulgent (says "correct" 61% of the time against a human's 27%). Refusals excluded, κ is
+   still negative (−0.147). Without those 60 labels, this project would have published the
+   judge's ranking; with them, the judge is replaced by a measured question — which judge,
+   if any, can be trusted on this task.
 2. **Retrieval helps when it brings the right document — and only that is shown**: oracle vs
    `bge-m3` correctness, 7/12 vs 1/10, Fisher p = 0.031 (unadjusted, pair chosen post hoc).
    Below the oracle nothing separates: the best v1 retriever scores no higher than no context
@@ -183,8 +186,9 @@ offline.
 
 ## Roadmap
 
-- **v2b** — a stronger judge (free-tier API) measured against the same 60 human labels; an 8B
-  generator on the oracle context; more labels on the two extreme contexts.
+- **v2b** — a stronger judge (free-tier API) measured against the same 60 human labels; an
+  answer prompt without the refusal clause; an 8B generator on the oracle context; a new
+  annotation round blind to the context, on the same questions for every context.
 - **v3** — synthetic question generation for any corpus, and a small demo app on top of the
   best configuration.
 
